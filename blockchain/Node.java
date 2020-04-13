@@ -1,6 +1,7 @@
 package blockchain;
 
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
@@ -10,51 +11,92 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.util.*;
 
+import com.google.gson.Gson;
+import java.util.concurrent.Executors;
+import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpExchange;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import message.*;
+
 public class Node {
 
-    private class block{
-        int id;
-        Map<String, String> map;
-        Timestamp timestamp;
-        int nonce;
-        String prehash;
-        String hash;
+    private HttpServer node_skeleton;
+    protected Gson gson;
+    private List<Integer> ports;
+    private int nodeId;
+    private List<Block> id_chain;
+    private List<Block> vote_chain;
 
-//        public block(int id, Map<String, String> map, Timestamp timestamp, int nonce,
-//                     String prehash, String hash) {
-    public block(int id, String hash) {
-            this.id = id;
-//            this.map = map;
-            this.timestamp = new Timestamp(System.currentTimeMillis());
-//            this.nonce = nonce;
-            this.prehash = hash;
-//            this.hash = hash;
-        }
+    // private class Block {
+    //     int id;
+    //     Map<String, String> map;
+    //     long timestamp;
+    //     long nonce;
+    //     String prehash;
+    //     String hash;
 
-        public void setHash(String string) throws NoSuchAlgorithmException {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(string.getBytes(StandardCharsets.UTF_8));
-            BigInteger number = new BigInteger(1, hash);
+    //     // public block(int id, Map<String, String> map, Timestamp timestamp, int nonce,
+    //     // String prehash, String hash) {
+    //     public Block(int id, String hash) {
+    //         this.id = id;
+    //         // this.map = map;
+    //         this.timestamp = System.currentTimeMillis();
+    //         // this.nonce = nonce;
+    //         this.prehash = hash;
+    //         // this.hash = hash;
+    //     }
 
-            // Convert message digest into hex value
-            StringBuilder hexString = new StringBuilder(number.toString(16));
+    //     public void setHash(String string) throws NoSuchAlgorithmException {
+    //         MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    //         byte[] hash = digest.digest(string.getBytes(StandardCharsets.UTF_8));
+    //         BigInteger number = new BigInteger(1, hash);
 
-            // Pad with leading zeros
-            while (hexString.length() < 32)
-            {
-                hexString.insert(0, '0');
-            }
+    //         // Convert message digest into hex value
+    //         StringBuilder hexString = new StringBuilder(number.toString(16));
 
-            this.hash = hexString.toString();
-        }
-    }
-    Node (String node_id, String port_list) {
-        int nodeid = Integer.parseInt(node_id);
+    //         // Pad with leading zeros
+    //         while (hexString.length() < 32) {
+    //             hexString.insert(0, '0');
+    //         }
+
+    //         this.hash = hexString.toString();
+    //     }
+    // }
+
+    Node(String node_id, String port_list) {
+        nodeId = Integer.parseInt(node_id);
         List<String> portstr = Arrays.asList(port_list.split(","));
-        List<Integer> ports = new ArrayList<>();
+        ports = new ArrayList<>();
         for (String port : portstr) {
             ports.add(Integer.parseInt(port));
         }
+        this.gson = new Gson();
+        try {
+            this.node_skeleton = HttpServer.create(new InetSocketAddress(ports.get(nodeId)), 0);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        this.node_skeleton.setExecutor(Executors.newCachedThreadPool());
+
+        this.add_node_api();
+        this.id_chain.add(new Block());
+        this.vote_chain.add(new Block());
+        this.node_skeleton.start();
+    }
+
+    private void add_node_api(){
+        this.getBlockChain();
+        this.node_skeleton.createContext("/getchain", (exchange -> {
+
+        }));
+    }
+
+    private void getBlockChain(){
 
     }
     public static void main(String[] args) throws Exception{
