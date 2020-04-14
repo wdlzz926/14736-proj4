@@ -22,6 +22,18 @@ import message.*;
 
 public class Node {
 
+    protected HttpResponse<String> getResponse(String method, int port, Object requestObj)
+            throws IOException, InterruptedException {
+
+        HttpResponse<String> response;
+        HttpRequest request = HttpRequest.newBuilder().uri(URI.create("http://localhost:" + port + method))
+                                      .setHeader("Content-Type", "application/json")
+                                      .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestObj))).build();
+
+        response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        return response;
+    }
+
     private HttpServer node_skeleton;
     protected Gson gson;
     private List<Integer> ports;
@@ -57,8 +69,36 @@ public class Node {
     }
 
     private void getBlockChain(){
+        this.node_skeleton.createContext("/getchain", (exchange -> {
+            String respText = "";
+            int returnCode = 200;
+            if ("POST".equals(exchange.getRequestMethod())) {
+                GetChainRequest getChainRequest = null;
+                try {
+                    Gson gson = new Gson();
+                    InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                    getChainRequest = gson.fromJson(isr, GetChainRequest.class);
+                } catch (Exception e) {
+                    System.out.print(exchange.getRequestBody());
+                    respText = "Error during parse JSON object!\n";
+                    returnCode = 400;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
+                int chain_id = getChainRequest.getChainId();
+                List<Block> blocks = this.id_chain;
+                int chain_length = blocks.size();
+                GetChainReply getChainReply = new GetChainReply(chain_id, chain_length, blocks);
+                respText = gson.toJson(getChainReply);
+            } else {
+                respText = "The REST method should be POST for <service api>!\n";
+                returnCode = 400;
+            }
+            this.generateResponseAndClose(exchange, respText, returnCode);
+        }));
 
     }
+
 
     private void mineBlock(){
         this.node_skeleton.createContext("/getchain", (exchange -> {
