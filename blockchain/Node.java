@@ -156,7 +156,7 @@ public class Node {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
 
-                }else{
+                }else if (chain_id == 2){
                     //vote chain
                     Block block = new Block(vote_chain.size(), data, 
                                         System.currentTimeMillis(), 0,vote_chain.getLast().getHash(),"");
@@ -168,6 +168,11 @@ public class Node {
                     returnCode = 200;
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
+                }
+                else {
+                    respText = "wrong chain_id!\n";
+                    returnCode = 404;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
                 }
                 
 
