@@ -86,7 +86,19 @@ public class Node {
                     return;
                 }
                 int chain_id = getChainRequest.getChainId();
-                List<Block> blocks = this.id_chain;
+                List<Block> blocks = new LinkedList<>();
+                if (chain_id == 1){
+                    blocks = this.id_chain;
+                }
+                else if (chain_id == 2) {
+                    blocks = this.vote_chain;
+                }
+                else {
+                    respText = "wrong chain_id!\n";
+                    returnCode = 404;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                }
+
                 int chain_length = blocks.size();
                 GetChainReply getChainReply = new GetChainReply(chain_id, chain_length, blocks);
                 respText = gson.toJson(getChainReply);
