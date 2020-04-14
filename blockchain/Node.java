@@ -89,6 +89,7 @@ public class Node {
                 int timeout = sleepRequest.getTimeout();
                 StatusReply statusReply = new StatusReply(true, "");
                 respText = gson.toJson(statusReply);
+                this.generateResponseAndClose(exchange, respText, returnCode);
                 try
                 {
                     Thread.sleep(1000 * timeout);
@@ -100,8 +101,9 @@ public class Node {
             } else {
                 respText = "The REST method should be POST for <service api>!\n";
                 returnCode = 400;
+                this.generateResponseAndClose(exchange, respText, returnCode);
             }
-            this.generateResponseAndClose(exchange, respText, returnCode);
+
         }));
     }
 
