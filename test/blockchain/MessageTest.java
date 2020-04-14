@@ -39,9 +39,9 @@ public class MessageTest extends NodeTest
         System.out.println("perform");
         testGetChainRequest();
         testMineBlockRequest();
-        testAddBlockRequest();
-        testBroadcastRequest();
-        testSleepRequest();
+        // testAddBlockRequest();
+        // testBroadcastRequest();
+        // testSleepRequest();
     }
 
     /**

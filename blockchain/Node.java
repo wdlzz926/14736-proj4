@@ -27,8 +27,8 @@ public class Node {
 
         HttpResponse<String> response;
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create("http://localhost:" + port + method))
-                                      .setHeader("Content-Type", "application/json")
-                                      .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestObj))).build();
+                .setHeader("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestObj))).build();
 
         response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
         return response;
@@ -55,7 +55,7 @@ public class Node {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        this.node_skeleton.setExecutor(Executors.newCachedThreadPool());
+        this.node_skeleton.setExecutor(null);
 
         this.add_node_api();
         this.id_chain.add(new Block());
@@ -63,12 +63,14 @@ public class Node {
         this.node_skeleton.start();
     }
 
-    private void add_node_api(){
+    private void add_node_api() {
         this.getBlockChain();
         this.mineBlock();
+        this.addBlock();
+        this.broadcast();
     }
 
-    private void getBlockChain(){
+    private void getBlockChain() {
         this.node_skeleton.createContext("/getchain", (exchange -> {
             String respText = "";
             int returnCode = 200;
@@ -87,13 +89,11 @@ public class Node {
                 }
                 int chain_id = getChainRequest.getChainId();
                 List<Block> blocks = new LinkedList<>();
-                if (chain_id == 1){
+                if (chain_id == 1) {
                     blocks = this.id_chain;
-                }
-                else if (chain_id == 2) {
+                } else if (chain_id == 2) {
                     blocks = this.vote_chain;
-                }
-                else {
+                } else {
                     respText = "wrong chain_id!\n";
                     returnCode = 404;
                     this.generateResponseAndClose(exchange, respText, returnCode);
@@ -111,8 +111,7 @@ public class Node {
 
     }
 
-
-    private void mineBlock(){
+    private void mineBlock() {
         this.node_skeleton.createContext("/getchain", (exchange -> {
             String respText = "";
             int returnCode = 200;
@@ -130,22 +129,20 @@ public class Node {
                     return;
                 }
 
-                //TODO: synchronize before mine
-                
-
+                // TODO: synchronize before mine
 
                 int chain_id = mineBlockRequest.getChainId();
                 Map<String, String> data = mineBlockRequest.getData();
-                if(chain_id ==1){
-                    //id chain
-                    Block block = new Block(id_chain.size(), data, 
-                                        System.currentTimeMillis(), 0,id_chain.getLast().getHash(),"");
-                    while(true){
+                if (chain_id == 1) {
+                    // id chain
+                    Block block = new Block(id_chain.size(), data, System.currentTimeMillis(), 0,
+                            id_chain.getLast().getHash(), "");
+                    while (true) {
                         String hash = Block.computeHash(block);
-                        if(hash.startsWith("00000")){
+                        if (hash.startsWith("00000")) {
                             block.setHash(hash);
                             break;
-                        }else{
+                        } else {
                             block.nonceIncrement();
                         }
                     }
@@ -156,10 +153,10 @@ public class Node {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
 
-                }else if (chain_id == 2){
-                    //vote chain
-                    Block block = new Block(vote_chain.size(), data, 
-                                        System.currentTimeMillis(), 0,vote_chain.getLast().getHash(),"");
+                } else if (chain_id == 2) {
+                    // vote chain
+                    Block block = new Block(vote_chain.size(), data, System.currentTimeMillis(), 0,
+                            vote_chain.getLast().getHash(), "");
                     String hash = Block.computeHash(block);
                     block.setHash(hash);
                     vote_chain.add(block);
@@ -168,12 +165,74 @@ public class Node {
                     returnCode = 200;
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
-                }
-                else {
+                } else {
                     respText = "wrong chain_id!\n";
                     returnCode = 404;
                     this.generateResponseAndClose(exchange, respText, returnCode);
                 }
+
+            } else {
+                respText = "The REST method should be POST for <node>!\n";
+                returnCode = 400;
+                this.generateResponseAndClose(exchange, respText, returnCode);
+                return;
+            }
+        }));
+
+    }
+
+    private void addBlock() {
+        this.node_skeleton.createContext("/addBlock", (exchange -> {
+            String respText = "";
+            int returnCode = 200;
+            if ("POST".equals(exchange.getRequestMethod())) {
+                AddBlockRequest addBlockRequest = null;
+                try {
+                    Gson gson = new Gson();
+                    InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                    addBlockRequest = gson.fromJson(isr, AddBlockRequest.class);
+                } catch (Exception e) {
+                    System.out.print(exchange.getRequestBody());
+                    respText = "Error during parse JSON object!\n";
+                    returnCode = 400;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
+
+                int chain_id = addBlockRequest.getChainId();
+                Block block = addBlockRequest.getBlock();
+                LinkedList<Block> block_chain;
+                int vote = 0;
+                if (chain_id == 1) {
+                    block_chain = id_chain;
+                } else if (chain_id == 2) {
+                    block_chain = vote_chain;
+                } else {
+                    respText = "wrong chain_id!\n";
+                    returnCode = 404;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
+                // PRECOMMIT
+                for (int i = 0; i < ports.size(); i++) {
+                    if (i == this.nodeId) {
+                        continue;
+                    }
+                    BroadcastRequest request = new BroadcastRequest(chain_id, "PRECOMMIT", block);
+                    try {
+                        HttpResponse<String> response = getResponse("broadcast", ports.get(i), request);
+                        Boolean success = gson.fromJson(response.body(),StatusReply.class).getSuccess();
+                        if(success){
+                            vote++;
+                        }
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+
+                }
+                
+                
                 
 
             }else{
@@ -183,7 +242,94 @@ public class Node {
                 return;
             }
         }));
-        
+    }
+
+    private void broadcast(){
+        this.node_skeleton.createContext("/broadcast", (exchange -> {
+            String respText = "";
+            int returnCode = 200;
+            if ("POST".equals(exchange.getRequestMethod())) {
+                BroadcastRequest broadcastRequest = null;
+                try {
+                    Gson gson = new Gson();
+                    InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                    broadcastRequest = gson.fromJson(isr, BroadcastRequest.class);
+                } catch (Exception e) {
+                    System.out.print(exchange.getRequestBody());
+                    respText = "Error during parse JSON object!\n";
+                    returnCode = 400;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
+                int chain_id = broadcastRequest.getChainId();
+                String type = broadcastRequest.getRequestType();
+                Block block = broadcastRequest.getBlock();
+                Boolean vote = false;
+                if(chain_id == 1){
+                    if (type.equals("PRECOMMIT")){
+                        if(block.getId() == id_chain.size() && 
+                        block.getPreviousHash() == id_chain.getLast().getHash() &&
+                        block.getHash().startsWith("00000")){
+                            vote = true;
+                        }
+                        
+
+                    }else if (type.equals("COMMIT")){
+                        if(block.getId() == id_chain.size() && 
+                        block.getPreviousHash() == id_chain.getLast().getHash() &&
+                        block.getHash().startsWith("00000")){
+                            id_chain.add(block);
+                            vote = true;
+                        }
+
+                    }else{
+                        respText = "wrong request type!\n";
+                        returnCode = 404;
+                        this.generateResponseAndClose(exchange, respText, returnCode);
+                        return;
+                    }
+                }else if (chain_id ==2){
+                    if (type.equals("PRECOMMIT")){
+                        if(block.getId() == vote_chain.size() && 
+                        block.getPreviousHash() == vote_chain.getLast().getHash()){
+                            vote = true;
+                        }
+                    }else if (type.equals("COMMIT")){
+                        if(block.getId() == vote_chain.size() && 
+                        block.getPreviousHash() == vote_chain.getLast().getHash()){
+                            vote_chain.add(block);
+                            vote = true;
+                        }
+                    }else{
+                        respText = "wrong request type!\n";
+                        returnCode = 404;
+                        this.generateResponseAndClose(exchange, respText, returnCode);
+                        return;
+                    }
+                    if(vote){
+                        returnCode = 200;
+                    }else{
+                        returnCode = 409;
+                    }
+
+                }else{
+                    respText = "wrong chain_id!\n";
+                    returnCode = 404;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
+
+                StatusReply reply = new StatusReply(vote);
+                respText = gson.toJson(reply);
+                this.generateResponseAndClose(exchange, respText, returnCode);
+
+            }else{
+                respText = "The REST method should be POST for <node>!\n";
+                returnCode = 400;
+                this.generateResponseAndClose(exchange, respText, returnCode);
+                return;
+            }
+        }));
     }
 
     /**
