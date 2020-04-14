@@ -1,8 +1,6 @@
 package blockchain;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -28,44 +26,8 @@ public class Node {
     protected Gson gson;
     private List<Integer> ports;
     private int nodeId;
-    private List<Block> id_chain;
-    private List<Block> vote_chain;
-
-    // private class Block {
-    //     int id;
-    //     Map<String, String> map;
-    //     long timestamp;
-    //     long nonce;
-    //     String prehash;
-    //     String hash;
-
-    //     // public block(int id, Map<String, String> map, Timestamp timestamp, int nonce,
-    //     // String prehash, String hash) {
-    //     public Block(int id, String hash) {
-    //         this.id = id;
-    //         // this.map = map;
-    //         this.timestamp = System.currentTimeMillis();
-    //         // this.nonce = nonce;
-    //         this.prehash = hash;
-    //         // this.hash = hash;
-    //     }
-
-    //     public void setHash(String string) throws NoSuchAlgorithmException {
-    //         MessageDigest digest = MessageDigest.getInstance("SHA-256");
-    //         byte[] hash = digest.digest(string.getBytes(StandardCharsets.UTF_8));
-    //         BigInteger number = new BigInteger(1, hash);
-
-    //         // Convert message digest into hex value
-    //         StringBuilder hexString = new StringBuilder(number.toString(16));
-
-    //         // Pad with leading zeros
-    //         while (hexString.length() < 32) {
-    //             hexString.insert(0, '0');
-    //         }
-
-    //         this.hash = hexString.toString();
-    //     }
-    // }
+    private LinkedList<Block> id_chain = new LinkedList<Block>();
+    private LinkedList<Block> vote_chain = new LinkedList<Block>();
 
     Node(String node_id, String port_list) {
         nodeId = Integer.parseInt(node_id);
@@ -91,14 +53,93 @@ public class Node {
 
     private void add_node_api(){
         this.getBlockChain();
-        this.node_skeleton.createContext("/getchain", (exchange -> {
-
-        }));
+        this.mineBlock();
     }
 
     private void getBlockChain(){
 
     }
+
+    private void mineBlock(){
+        this.node_skeleton.createContext("/getchain", (exchange -> {
+            String respText = "";
+            int returnCode = 200;
+            if ("POST".equals(exchange.getRequestMethod())) {
+                MineBlockRequest mineBlockRequest = null;
+                try {
+                    Gson gson = new Gson();
+                    InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                    mineBlockRequest = gson.fromJson(isr, MineBlockRequest.class);
+                } catch (Exception e) {
+                    System.out.print(exchange.getRequestBody());
+                    respText = "Error during parse JSON object!\n";
+                    returnCode = 400;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
+
+                //TODO: synchronize before mine
+                
+
+
+                int chain_id = mineBlockRequest.getChainId();
+                Map<String, String> data = mineBlockRequest.getData();
+                if(chain_id ==1){
+                    //id chain
+                    Block block = new Block(id_chain.size(), data, 
+                                        System.currentTimeMillis(), 0,id_chain.getLast().getHash(),"");
+                    while(true){
+                        String hash = Block.computeHash(block);
+                        if(hash.startsWith("00000")){
+                            block.setHash(hash);
+                            break;
+                        }else{
+                            block.nonceIncrement();
+                        }
+                    }
+                    id_chain.add(block);
+                    BlockReply reply = new BlockReply(chain_id, block);
+                    respText = gson.toJson(reply);
+                    returnCode = 200;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+
+                }else{
+                    //vote chain
+                    Block block = new Block(vote_chain.size(), data, 
+                                        System.currentTimeMillis(), 0,vote_chain.getLast().getHash(),"");
+                    String hash = Block.computeHash(block);
+                    block.setHash(hash);
+                    vote_chain.add(block);
+                    BlockReply reply = new BlockReply(chain_id, block);
+                    respText = gson.toJson(reply);
+                    returnCode = 200;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
+                
+
+            }else{
+                respText = "The REST method should be POST for <node>!\n";
+                returnCode = 400;
+                this.generateResponseAndClose(exchange, respText, returnCode);
+                return;
+            }
+        }));
+        
+    }
+
+    /**
+     * call this function when you want to write to response and close the connection.
+     */
+    private void generateResponseAndClose(HttpExchange exchange, String respText, int returnCode) throws IOException {
+        exchange.sendResponseHeaders(returnCode, respText.getBytes().length);
+        OutputStream output = exchange.getResponseBody();
+        output.write(respText.getBytes());
+        output.flush();
+        exchange.close();
+    }
+
     public static void main(String[] args) throws Exception{
         if (args.length != 2) throw new Exception("Need 2 args: <index id> <port list> ");
         FileOutputStream f = new FileOutputStream("node.log",true);

@@ -55,6 +55,10 @@ public class Block {
         return nonce;
     }
 
+    public void nonceIncrement(){
+        this.nonce+=1;
+    }
+
     // Returns the hash of the previous block
     public String getPreviousHash() {
         return previous_hash;
@@ -64,6 +68,7 @@ public class Block {
     public String getHash() {
         return hash;
     }
+
 
     public void setHash(String hash)
     {
