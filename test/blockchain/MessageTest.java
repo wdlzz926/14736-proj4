@@ -37,10 +37,10 @@ public class MessageTest extends NodeTest
     protected void perform() throws TestFailed
     {
         System.out.println("perform");
-        testGetChainRequest();
-        testMineBlockRequest();
-        testAddBlockRequest();
-        testBroadcastRequest();
+//        testGetChainRequest();
+//        testMineBlockRequest();
+//        testAddBlockRequest();
+//        testBroadcastRequest();
         testSleepRequest();
     }
 

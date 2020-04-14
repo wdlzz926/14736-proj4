@@ -66,6 +66,42 @@ public class Node {
     private void add_node_api(){
         this.getBlockChain();
         this.mineBlock();
+        this.sleep();
+    }
+    private void sleep(){
+        this.node_skeleton.createContext("/sleep", (exchange -> {
+            String respText = "";
+            int returnCode = 200;
+            if ("POST".equals(exchange.getRequestMethod())) {
+                SleepRequest sleepRequest = null;
+                try {
+                    Gson gson = new Gson();
+                    InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                    sleepRequest = gson.fromJson(isr, SleepRequest.class);
+                } catch (Exception e) {
+                    System.out.print(exchange.getRequestBody());
+                    respText = "Error during parse JSON object!\n";
+                    returnCode = 400;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
+                int timeout = sleepRequest.getTimeout();
+                StatusReply statusReply = new StatusReply(true, "");
+                respText = gson.toJson(statusReply);
+                try
+                {
+                    Thread.sleep(1000 * timeout);
+                }
+                catch(InterruptedException ex)
+                {
+                    Thread.currentThread().interrupt();
+                }
+            } else {
+                respText = "The REST method should be POST for <service api>!\n";
+                returnCode = 400;
+            }
+            this.generateResponseAndClose(exchange, respText, returnCode);
+        }));
     }
 
     private void getBlockChain(){
