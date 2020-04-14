@@ -220,7 +220,7 @@ public class Node {
     }
 
     private void addBlock() {
-        this.node_skeleton.createContext("/addBlock", (exchange -> {
+        this.node_skeleton.createContext("/addblock", (exchange -> {
             String respText = "";
             int returnCode = 200;
             if ("POST".equals(exchange.getRequestMethod())) {
@@ -240,9 +240,19 @@ public class Node {
                 Block block = addBlockRequest.getBlock();
                 LinkedList<Block> block_chain;
                 int vote = 0;
+                Boolean valid = false;
                 if (chain_id == 1) {
+                    if(block.getId() == id_chain.size() && 
+                        block.getPreviousHash() == id_chain.getLast().getHash() &&
+                        block.getHash().startsWith("00000")){
+                            valid = true;
+                    }
                     block_chain = id_chain;
                 } else if (chain_id == 2) {
+                    if(block.getId() == vote_chain.size() && 
+                        block.getPreviousHash() == vote_chain.getLast().getHash()){
+                            valid = true;
+                    }
                     block_chain = vote_chain;
                 } else {
                     respText = "wrong chain_id!\n";
@@ -250,6 +260,17 @@ public class Node {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 }
+
+                if(valid==false){
+                    returnCode = 409;
+                    StatusReply reply = new StatusReply(valid);
+                    respText = gson.toJson(reply);
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    System.out.println("invalid with local blockChain");
+                    System.out.flush();
+                    return;
+                }
+
                 // PRECOMMIT
                 for (int i = 0; i < ports.size(); i++) {
                     if (i == this.nodeId) {

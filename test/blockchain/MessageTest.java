@@ -37,11 +37,11 @@ public class MessageTest extends NodeTest
     protected void perform() throws TestFailed
     {
         System.out.println("perform");
-//        testGetChainRequest();
-//        testMineBlockRequest();
-//         testAddBlockRequest();
-//         testBroadcastRequest();
-         testSleepRequest();
+        testGetChainRequest();
+        testMineBlockRequest();
+        testAddBlockRequest();
+        testBroadcastRequest();
+        testSleepRequest();
     }
 
     /**
@@ -51,6 +51,7 @@ public class MessageTest extends NodeTest
      */
     private void testGetChainRequest() throws TestFailed
     {
+        System.out.println("GetChainRequest");
         for (int c = 0; c < 2; c++)
         {
             int chain_id = CHAIN_IDS[c];
@@ -97,6 +98,7 @@ public class MessageTest extends NodeTest
      */
     private void testMineBlockRequest() throws TestFailed
     {
+        System.out.println("MineBlock");
         for (int c = 0; c < 2; c++)
         {
             int chain_id = CHAIN_IDS[c];
@@ -143,6 +145,7 @@ public class MessageTest extends NodeTest
      */
     private void testAddBlockRequest() throws TestFailed
     {
+        System.out.println("AddBlock");
         for (int c = 0; c < 2; c++)
         {
             int chain_id = CHAIN_IDS[c];
@@ -182,6 +185,7 @@ public class MessageTest extends NodeTest
      */
     private void testBroadcastRequest() throws TestFailed
     {
+        System.out.println("Broadcast");
         for (int c = 0; c < 2; c++)
         {
             int chain_id = CHAIN_IDS[c];
@@ -218,6 +222,7 @@ public class MessageTest extends NodeTest
      */
     private void testSleepRequest() throws TestFailed
     {
+        System.out.println("Sleep");
         SleepRequest request = new SleepRequest(SLEEP_TIMEOUT);
         int chain_id = 1;
 
