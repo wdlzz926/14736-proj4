@@ -66,10 +66,8 @@ public class Node {
     private void add_node_api() {
         this.getBlockChain();
         this.mineBlock();
-<<<<<<< HEAD
         this.addBlock();
         this.broadcast();
-=======
         this.sleep();
     }
     private void sleep(){
@@ -92,6 +90,7 @@ public class Node {
                 int timeout = sleepRequest.getTimeout();
                 StatusReply statusReply = new StatusReply(true, "");
                 respText = gson.toJson(statusReply);
+                this.generateResponseAndClose(exchange, respText, returnCode);
                 try
                 {
                     Thread.sleep(1000 * timeout);
@@ -103,10 +102,10 @@ public class Node {
             } else {
                 respText = "The REST method should be POST for <service api>!\n";
                 returnCode = 400;
+                this.generateResponseAndClose(exchange, respText, returnCode);
             }
-            this.generateResponseAndClose(exchange, respText, returnCode);
+
         }));
->>>>>>> 826d1b0fb5e06e2ba31695be4bfc04520c0ed0b2
     }
 
     private void getBlockChain() {
@@ -136,6 +135,7 @@ public class Node {
                     respText = "wrong chain_id!\n";
                     returnCode = 404;
                     this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
                 }
 
                 int chain_length = blocks.size();
@@ -151,7 +151,7 @@ public class Node {
     }
 
     private void mineBlock() {
-        this.node_skeleton.createContext("/getchain", (exchange -> {
+        this.node_skeleton.createContext("/mineblock", (exchange -> {
             String respText = "";
             int returnCode = 200;
             if ("POST".equals(exchange.getRequestMethod())) {

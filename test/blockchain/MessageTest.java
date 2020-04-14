@@ -37,11 +37,11 @@ public class MessageTest extends NodeTest
     protected void perform() throws TestFailed
     {
         System.out.println("perform");
-        testGetChainRequest();
-        testMineBlockRequest();
-        // testAddBlockRequest();
-        // testBroadcastRequest();
-        // testSleepRequest();
+//        testGetChainRequest();
+//        testMineBlockRequest();
+//         testAddBlockRequest();
+//         testBroadcastRequest();
+         testSleepRequest();
     }
 
     /**
@@ -54,10 +54,10 @@ public class MessageTest extends NodeTest
         for (int c = 0; c < 2; c++)
         {
             int chain_id = CHAIN_IDS[c];
-            System.out.println("testGetChainRequest");
+//            System.out.println("testGetChainRequest");
 
             GetChainRequest request = new GetChainRequest(chain_id);
-            System.out.println("get testGetChainRequest result");
+//            System.out.println("get testGetChainRequest result");
             for (int i = 0; i < nodes.size(); i++) {
                 int port = nodes.get(i);
                 String uri = HOST_URI + port + GET_CHAIN_URI;
@@ -112,7 +112,8 @@ public class MessageTest extends NodeTest
                 try
                 {
                     reply = client.post(uri, request, BlockReply.class);
-
+//                    System.out.println("reply: ");
+//                    System.out.println(reply);
                     if (reply == null) throw new Exception();
                 }
                 catch (Exception ex)
@@ -230,7 +231,9 @@ public class MessageTest extends NodeTest
             StatusReply reply;
             try
             {
+//                System.out.println("reply: ");
                 reply = client.post(uri, request, StatusReply.class);
+//                System.out.println(reply);
             }
             catch (Exception ex)
             {
