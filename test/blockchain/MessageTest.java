@@ -36,6 +36,7 @@ public class MessageTest extends NodeTest
     @Override
     protected void perform() throws TestFailed
     {
+        System.out.println("perform");
         testGetChainRequest();
         testMineBlockRequest();
         testAddBlockRequest();
@@ -53,9 +54,10 @@ public class MessageTest extends NodeTest
         for (int c = 0; c < 2; c++)
         {
             int chain_id = CHAIN_IDS[c];
+            System.out.println("testGetChainRequest");
 
             GetChainRequest request = new GetChainRequest(chain_id);
-
+            System.out.println("get testGetChainRequest result");
             for (int i = 0; i < nodes.size(); i++) {
                 int port = nodes.get(i);
                 String uri = HOST_URI + port + GET_CHAIN_URI;
