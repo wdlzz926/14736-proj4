@@ -66,10 +66,8 @@ public class Node {
     private void add_node_api() {
         this.getBlockChain();
         this.mineBlock();
-<<<<<<< HEAD
         this.addBlock();
         this.broadcast();
-=======
         this.sleep();
     }
     private void sleep(){
@@ -83,7 +81,6 @@ public class Node {
                     InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
                     sleepRequest = gson.fromJson(isr, SleepRequest.class);
                 } catch (Exception e) {
-                    System.out.print(exchange.getRequestBody());
                     respText = "Error during parse JSON object!\n";
                     returnCode = 400;
                     this.generateResponseAndClose(exchange, respText, returnCode);
@@ -106,7 +103,6 @@ public class Node {
             }
             this.generateResponseAndClose(exchange, respText, returnCode);
         }));
->>>>>>> 826d1b0fb5e06e2ba31695be4bfc04520c0ed0b2
     }
 
     private void getBlockChain() {
@@ -120,7 +116,6 @@ public class Node {
                     InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
                     getChainRequest = gson.fromJson(isr, GetChainRequest.class);
                 } catch (Exception e) {
-                    System.out.print(exchange.getRequestBody());
                     respText = "Error during parse JSON object!\n";
                     returnCode = 400;
                     this.generateResponseAndClose(exchange, respText, returnCode);
@@ -136,6 +131,7 @@ public class Node {
                     respText = "wrong chain_id!\n";
                     returnCode = 404;
                     this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
                 }
 
                 int chain_length = blocks.size();
@@ -151,7 +147,9 @@ public class Node {
     }
 
     private void mineBlock() {
-        this.node_skeleton.createContext("/getchain", (exchange -> {
+        this.node_skeleton.createContext("/mineblock", (exchange -> {
+            FileOutputStream f = new FileOutputStream("node.log",true);
+            System.setOut(new PrintStream(f));
             String respText = "";
             int returnCode = 200;
             if ("POST".equals(exchange.getRequestMethod())) {
@@ -161,7 +159,6 @@ public class Node {
                     InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
                     mineBlockRequest = gson.fromJson(isr, MineBlockRequest.class);
                 } catch (Exception e) {
-                    System.out.print(exchange.getRequestBody());
                     respText = "Error during parse JSON object!\n";
                     returnCode = 400;
                     this.generateResponseAndClose(exchange, respText, returnCode);
@@ -172,6 +169,7 @@ public class Node {
 
                 int chain_id = mineBlockRequest.getChainId();
                 Map<String, String> data = mineBlockRequest.getData();
+
                 if (chain_id == 1) {
                     // id chain
                     Block block = new Block(id_chain.size(), data, System.currentTimeMillis(), 0,
@@ -214,7 +212,6 @@ public class Node {
                 respText = "The REST method should be POST for <node>!\n";
                 returnCode = 400;
                 this.generateResponseAndClose(exchange, respText, returnCode);
-                return;
             }
         }));
 
@@ -231,7 +228,6 @@ public class Node {
                     InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
                     addBlockRequest = gson.fromJson(isr, AddBlockRequest.class);
                 } catch (Exception e) {
-                    System.out.print(exchange.getRequestBody());
                     respText = "Error during parse JSON object!\n";
                     returnCode = 400;
                     this.generateResponseAndClose(exchange, respText, returnCode);
@@ -270,8 +266,31 @@ public class Node {
                     }
 
                 }
-                
-                
+                Boolean success = false;
+                if(vote > ports.size()*2/3){
+                    //Commit
+                    block_chain.add(block);
+                    success = true;
+                    returnCode =200;
+                    for (int i = 0; i < ports.size(); i++) {
+                        if (i == this.nodeId) {
+                            continue;
+                        }
+                        BroadcastRequest request = new BroadcastRequest(chain_id, "COMMIT", block);
+                        try {
+                            HttpResponse<String> response = getResponse("broadcast", ports.get(i), request);
+                        } catch (InterruptedException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+    
+                    }
+                }else{
+                    returnCode = 409;
+                }
+                StatusReply reply = new StatusReply(success);
+                respText = gson.toJson(reply);
+                this.generateResponseAndClose(exchange, respText, returnCode);
                 
 
             }else{
@@ -294,7 +313,6 @@ public class Node {
                     InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
                     broadcastRequest = gson.fromJson(isr, BroadcastRequest.class);
                 } catch (Exception e) {
-                    System.out.print(exchange.getRequestBody());
                     respText = "Error during parse JSON object!\n";
                     returnCode = 400;
                     this.generateResponseAndClose(exchange, respText, returnCode);
