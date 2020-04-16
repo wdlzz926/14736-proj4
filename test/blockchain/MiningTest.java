@@ -123,6 +123,9 @@ public class MiningTest extends NodeTest
                 mine_reply = client.post(mine_uri, mine_request,
                         BlockReply.class);
                 if (mine_reply == null) throw new Exception();
+//                System.out.println(mine_reply.getChainId());
+//                System.out.println(mine_reply.getBlock());
+//                System.out.println(c);
 
                 block = mine_reply.getBlock();
                 if (block == null) throw new Exception();
@@ -151,7 +154,7 @@ public class MiningTest extends NodeTest
             {
                 add_reply = client.post(add_uri, add_request,
                         StatusReply.class);
-                System.out.println(add_reply.getInfo());
+//                System.out.println(add_reply.getInfo());
                 if (add_reply == null) throw new Exception();
             }
             catch (Exception ex)
@@ -282,6 +285,11 @@ public class MiningTest extends NodeTest
             try
             {
                 reply = client.post(uri, request, GetChainReply.class);
+//                System.out.println("check");
+//                for (int i = 0; i < reply.getBlocks().size(); i++) {
+//                    System.out.println(reply.getBlocks().get(i));
+//                }
+
 
                 if (reply == null) throw new Exception();
             }

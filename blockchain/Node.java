@@ -197,10 +197,10 @@ public class Node {
                             block.nonceIncrement();
                         }
                     }
-                    id_chain.add(block);
-                    if (id_chain.size() == 2 &&  id_chain.getFirst().getHash().equals( "dummy")) {
-                        id_chain.removeFirst();
-                    }
+//                    id_chain.add(block);
+//                    if (id_chain.size() == 2 &&  id_chain.getFirst().getHash().equals( "dummy")) {
+//                        id_chain.removeFirst();
+//                    }
                     BlockReply reply = new BlockReply(chain_id, block);
                     respText = gson.toJson(reply);
 //                    returnCode = 200;
@@ -214,11 +214,11 @@ public class Node {
                             vote_chain.getLast().getHash(), "");
                     String hash = Block.computeHash(block);
                     block.setHash(hash);
-                    vote_chain.add(block);
+//                    vote_chain.add(block);
 //                    first one
-                    if (vote_chain.size() == 2 &&  vote_chain.getFirst().getHash().equals( "dummy")) {
-                        vote_chain.removeFirst();
-                    }
+//                    if (vote_chain.size() == 2 &&  vote_chain.getFirst().getHash().equals( "dummy")) {
+//                        vote_chain.removeFirst();
+//                    }
                     BlockReply reply = new BlockReply(chain_id, block);
                     respText = gson.toJson(reply);
 //                    returnCode = 200;
@@ -262,8 +262,10 @@ public class Node {
                 int vote = 0;
                 Boolean valid = false;
                 if (chain_id == 1) {
+                    System.out.println(id_chain.getLast().getHash());
+                    System.out.println(block.getPreviousHash());
                     if(block.getId() == id_chain.size() &&
-//                               block.getPreviousHash().equals( id_chain.getLast().getHash()) &&
+                               block.getPreviousHash().equals( id_chain.getLast().getHash()) &&
                                block.getHash().startsWith("00000")){
                             valid = true;
                     }
@@ -392,8 +394,6 @@ public class Node {
                         block.getHash().startsWith("00000")){
                             vote = true;
                         }
-                        
-
                     }else if (type.equals("COMMIT")){
                         if(block.getId() == id_chain.size() && 
                         block.getPreviousHash().equals(id_chain.getLast().getHash()) &&
