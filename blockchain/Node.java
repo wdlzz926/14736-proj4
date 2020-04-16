@@ -18,19 +18,29 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+
+import lib.MessageSender;
 import message.*;
 
 public class Node {
+    protected static final String HOST_URI = "http://127.0.0.1:";
+    protected static final String GET_CHAIN_URI = "/getchain";
+    protected static final String MINE_BLOCK_URI = "/mineblock";
+    protected static final String ADD_BLOCK_URI = "/addblock";
+    protected static final String BROADCAST_URI = "/broadcast";
 
     protected HttpResponse<String> getResponse(String method, int port, Object requestObj)
             throws IOException, InterruptedException {
+        System.out.println("getResponse");
 
         HttpResponse<String> response;
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create("http://localhost:" + port + method))
                 .setHeader("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestObj))).build();
+        System.out.println("create request");
 
         response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("get response");
         return response;
     }
 
@@ -43,6 +53,8 @@ public class Node {
 
     Node(String node_id, String port_list) {
         nodeId = Integer.parseInt(node_id);
+        System.out.print("this.nodeId = ");
+        System.out.println(nodeId);
         List<String> portstr = Arrays.asList(port_list.split(","));
         ports = new ArrayList<>();
         for (String port : portstr) {
@@ -271,28 +283,37 @@ public class Node {
 
                 if(!valid){
                     returnCode = 409;
-                    StatusReply reply = new StatusReply(false, "409");
+                    StatusReply reply = new StatusReply(false);
                     respText = gson.toJson(reply);
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     System.out.println("invalid with local blockChain");
                     System.out.flush();
                     return;
                 }
-
+//                System.out.println("start precommit");
                 // PRECOMMIT
                 for (int i = 0; i < ports.size(); i++) {
                     if (i == this.nodeId) {
+                        System.out.println("i == this.nodeId");
+                        System.out.println(this.nodeId);
                         continue;
                     }
                     BroadcastRequest request = new BroadcastRequest(chain_id, "PRECOMMIT", block);
+                    System.out.println("try broadcast");
+                    System.out.println(ports.get(i));
+                    String uri = HOST_URI + ports.get(i) + BROADCAST_URI;
+                    MessageSender messageSender = new MessageSender(10);
+                    StatusReply reply;
                     try {
-                        HttpResponse<String> response = getResponse("broadcast", ports.get(i), request);
-                        Boolean success = gson.fromJson(response.body(),StatusReply.class).getSuccess();
-                        if(success){
+                        reply = messageSender.post(uri, request, StatusReply.class);
+                        if (reply != null && reply.getSuccess())
+                        {
                             vote++;
                         }
                     } catch (InterruptedException e) {
                         // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    } catch (Exception e) {
                         e.printStackTrace();
                     }
 
@@ -300,6 +321,7 @@ public class Node {
                 Boolean success = false;
                 if(vote > ports.size()*2/3){
                     //Commit
+                    System.out.println("try commit");
                     block_chain.add(block);
                     success = true;
                     returnCode =200;
@@ -308,15 +330,25 @@ public class Node {
                             continue;
                         }
                         BroadcastRequest request = new BroadcastRequest(chain_id, "COMMIT", block);
+                        String uri = HOST_URI + ports.get(i) + BROADCAST_URI;
+                        MessageSender messageSender = new MessageSender(10);
+                        StatusReply reply;
                         try {
-                            HttpResponse<String> response = getResponse("broadcast", ports.get(i), request);
+                            reply = messageSender.post(uri, request, StatusReply.class);
+                            if (reply != null && reply.getSuccess())
+                            {
+                                vote++;
+                            }
                         } catch (InterruptedException e) {
                             // TODO Auto-generated catch block
                             e.printStackTrace();
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
-    
+
                     }
                 }else{
+                    System.out.println("fail commit");
                     returnCode = 409;
                 }
                 StatusReply reply = new StatusReply(success);
@@ -347,14 +379,16 @@ public class Node {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 }
+                System.out.println("start broadcast");
                 int chain_id = broadcastRequest.getChainId();
                 String type = broadcastRequest.getRequestType();
                 Block block = broadcastRequest.getBlock();
                 Boolean vote = false;
+                System.out.println("broadcast");
                 if(chain_id == 1){
                     if (type.equals("PRECOMMIT")){
                         if(block.getId() == id_chain.size() && 
-                        block.getPreviousHash() == id_chain.getLast().getHash() &&
+                        block.getPreviousHash().equals(id_chain.getLast().getHash() )&&
                         block.getHash().startsWith("00000")){
                             vote = true;
                         }
@@ -362,7 +396,7 @@ public class Node {
 
                     }else if (type.equals("COMMIT")){
                         if(block.getId() == id_chain.size() && 
-                        block.getPreviousHash() == id_chain.getLast().getHash() &&
+                        block.getPreviousHash().equals(id_chain.getLast().getHash()) &&
                         block.getHash().startsWith("00000")){
                             id_chain.add(block);
                             vote = true;
@@ -376,13 +410,13 @@ public class Node {
                     }
                 }else if (chain_id ==2){
                     if (type.equals("PRECOMMIT")){
-                        if(block.getId() == vote_chain.size() && 
-                        block.getPreviousHash() == vote_chain.getLast().getHash()){
+                        if(block.getId() == vote_chain.size() &&
+                                   block.getPreviousHash().equals(vote_chain.getLast().getHash())){
                             vote = true;
                         }
                     }else if (type.equals("COMMIT")){
-                        if(block.getId() == vote_chain.size() && 
-                        block.getPreviousHash() == vote_chain.getLast().getHash()){
+                        if(block.getId() == vote_chain.size() &&
+                                   block.getPreviousHash().equals(vote_chain.getLast().getHash())){
                             vote_chain.add(block);
                             vote = true;
                         }
@@ -433,6 +467,10 @@ public class Node {
         if (args.length != 2) throw new Exception("Need 2 args: <index id> <port list> ");
         FileOutputStream f = new FileOutputStream("node.log",true);
         System.setOut(new PrintStream(f));
+        System.out.println("start challenge!");
+        System.out.println(args.length);
+        System.out.println(args[0]);
+        System.out.println(args[1]);
         Node node = new Node(args[0], args[1]);
 //        node.start();
     }
