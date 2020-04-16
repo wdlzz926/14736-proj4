@@ -151,6 +151,7 @@ public class MiningTest extends NodeTest
             {
                 add_reply = client.post(add_uri, add_request,
                         StatusReply.class);
+                System.out.println(add_reply.getInfo());
                 if (add_reply == null) throw new Exception();
             }
             catch (Exception ex)

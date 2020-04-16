@@ -186,22 +186,30 @@ public class Node {
                         }
                     }
                     id_chain.add(block);
+                    if (id_chain.size() == 2 &&  id_chain.getFirst().getHash().equals( "dummy")) {
+                        id_chain.removeFirst();
+                    }
                     BlockReply reply = new BlockReply(chain_id, block);
                     respText = gson.toJson(reply);
-                    returnCode = 200;
+//                    returnCode = 200;
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
 
                 } else if (chain_id == 2) {
                     // vote chain
+
                     Block block = new Block(vote_chain.size(), data, System.currentTimeMillis(), 0,
                             vote_chain.getLast().getHash(), "");
                     String hash = Block.computeHash(block);
                     block.setHash(hash);
                     vote_chain.add(block);
+//                    first one
+                    if (vote_chain.size() == 2 &&  vote_chain.getFirst().getHash().equals( "dummy")) {
+                        vote_chain.removeFirst();
+                    }
                     BlockReply reply = new BlockReply(chain_id, block);
                     respText = gson.toJson(reply);
-                    returnCode = 200;
+//                    returnCode = 200;
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 } else {
@@ -242,15 +250,15 @@ public class Node {
                 int vote = 0;
                 Boolean valid = false;
                 if (chain_id == 1) {
-                    if(block.getId() == id_chain.size() && 
-                        block.getPreviousHash() == id_chain.getLast().getHash() &&
-                        block.getHash().startsWith("00000")){
+                    if(block.getId() == id_chain.size() &&
+//                               block.getPreviousHash().equals( id_chain.getLast().getHash()) &&
+                               block.getHash().startsWith("00000")){
                             valid = true;
                     }
                     block_chain = id_chain;
                 } else if (chain_id == 2) {
                     if(block.getId() == vote_chain.size() && 
-                        block.getPreviousHash() == vote_chain.getLast().getHash()){
+                        block.getPreviousHash().equals(vote_chain.getLast().getHash())){
                             valid = true;
                     }
                     block_chain = vote_chain;
@@ -261,9 +269,9 @@ public class Node {
                     return;
                 }
 
-                if(valid==false){
+                if(!valid){
                     returnCode = 409;
-                    StatusReply reply = new StatusReply(valid);
+                    StatusReply reply = new StatusReply(false, "409");
                     respText = gson.toJson(reply);
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     System.out.println("invalid with local blockChain");
@@ -314,8 +322,6 @@ public class Node {
                 StatusReply reply = new StatusReply(success);
                 respText = gson.toJson(reply);
                 this.generateResponseAndClose(exchange, respText, returnCode);
-                
-
             }else{
                 respText = "The REST method should be POST for <node>!\n";
                 returnCode = 400;
