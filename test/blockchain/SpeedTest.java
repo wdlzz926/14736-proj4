@@ -120,6 +120,8 @@ public class SpeedTest extends NodeTest
         }
         else
         {
+            String msg = String.format("%.3f", time_elapsed / 1000);
+            System.out.println(" fail in " + msg + " seconds");
             throw new TestFailed("Speed test failed: " +
                     "Concurrent mining timed out.");
         }

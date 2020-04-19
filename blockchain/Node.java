@@ -50,11 +50,10 @@ public class Node {
     private int nodeId;
     private LinkedList<Block> id_chain = new LinkedList<Block>();
     private LinkedList<Block> vote_chain = new LinkedList<Block>();
+    private MessageSender messageSender = new MessageSender(1);
 
     Node(String node_id, String port_list) {
         nodeId = Integer.parseInt(node_id);
-        System.out.print("this.nodeId = ");
-        System.out.println(nodeId);
         List<String> portstr = Arrays.asList(port_list.split(","));
         ports = new ArrayList<>();
         for (String port : portstr) {
@@ -82,7 +81,8 @@ public class Node {
         this.broadcast();
         this.sleep();
     }
-    private void sleep(){
+
+    private void sleep() {
         this.node_skeleton.createContext("/sleep", (exchange -> {
             String respText = "";
             int returnCode = 200;
@@ -102,12 +102,9 @@ public class Node {
                 StatusReply statusReply = new StatusReply(true, "");
                 respText = gson.toJson(statusReply);
                 this.generateResponseAndClose(exchange, respText, returnCode);
-                try
-                {
+                try {
                     Thread.sleep(1000 * timeout);
-                }
-                catch(InterruptedException ex)
-                {
+                } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
                 }
             } else {
@@ -160,6 +157,39 @@ public class Node {
 
     }
 
+    private void synchronize_block_chain(int chain_id) {
+        LinkedList<Block> block_chain;
+        if (chain_id == 1) {
+            block_chain = id_chain;
+        } else{
+            block_chain = vote_chain;
+        }
+        for (int i = 0; i < ports.size(); i++) {
+            if (i == this.nodeId) {
+                continue;
+            }
+            String uri = HOST_URI + ports.get(i) + BROADCAST_URI;
+            GetChainRequest request = new GetChainRequest(chain_id);
+            try {
+                GetChainReply reply = messageSender.post(uri, request, GetChainReply.class);
+                if(reply.getChainLength()>block_chain.size()){
+                    //need to update
+                    block_chain.clear();
+                    block_chain.addAll(reply.getBlocks());
+                    System.out.println("Node "+ String.valueOf(nodeId)+" synchronized from "+String.valueOf(i));
+                    System.out.flush();
+                }
+            } catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+
+
+
+
+
+    }
     private void mineBlock() {
         this.node_skeleton.createContext("/mineblock", (exchange -> {
             FileOutputStream f = new FileOutputStream("node.log",true);
@@ -178,13 +208,13 @@ public class Node {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 }
-
-                // TODO: synchronize before mine
+                
 
                 int chain_id = mineBlockRequest.getChainId();
                 Map<String, String> data = mineBlockRequest.getData();
 
                 if (chain_id == 1) {
+                    synchronize_block_chain(1);
                     // id chain
                     Block block = new Block(id_chain.size(), data, System.currentTimeMillis(), 0,
                             id_chain.getLast().getHash(), "");
@@ -208,8 +238,8 @@ public class Node {
                     return;
 
                 } else if (chain_id == 2) {
+                    synchronize_block_chain(2);
                     // vote chain
-
                     Block block = new Block(vote_chain.size(), data, System.currentTimeMillis(), 0,
                             vote_chain.getLast().getHash(), "");
                     String hash = Block.computeHash(block);
@@ -255,11 +285,14 @@ public class Node {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 }
-
+                
                 int chain_id = addBlockRequest.getChainId();
                 Block block = addBlockRequest.getBlock();
                 LinkedList<Block> block_chain;
-                int vote = 0;
+
+                // System.out.println();
+
+                int vote = 1;
                 Boolean valid = false;
                 if (chain_id == 1) {
                     System.out.println(id_chain.getLast().getHash());
@@ -301,10 +334,9 @@ public class Node {
                         continue;
                     }
                     BroadcastRequest request = new BroadcastRequest(chain_id, "PRECOMMIT", block);
-                    System.out.println("try broadcast");
-                    System.out.println(ports.get(i));
+                    System.out.println("try broadcast " + String.valueOf(ports.get(i)));
                     String uri = HOST_URI + ports.get(i) + BROADCAST_URI;
-                    MessageSender messageSender = new MessageSender(10);
+                    
                     StatusReply reply;
                     try {
                         reply = messageSender.post(uri, request, StatusReply.class);
@@ -321,7 +353,10 @@ public class Node {
 
                 }
                 Boolean success = false;
-                if(vote > ports.size()*2/3){
+                int majority = (int) Math.ceil(ports.size() * 2.0 / 3);
+                System.out.println("majority "+String.valueOf(majority));
+                System.out.println("vote result "+ String.valueOf(vote));
+                if(vote >= majority){
                     //Commit
                     System.out.println("try commit");
                     block_chain.add(block);
@@ -333,7 +368,6 @@ public class Node {
                         }
                         BroadcastRequest request = new BroadcastRequest(chain_id, "COMMIT", block);
                         String uri = HOST_URI + ports.get(i) + BROADCAST_URI;
-                        MessageSender messageSender = new MessageSender(10);
                         StatusReply reply;
                         try {
                             reply = messageSender.post(uri, request, StatusReply.class);
@@ -386,7 +420,6 @@ public class Node {
                 String type = broadcastRequest.getRequestType();
                 Block block = broadcastRequest.getBlock();
                 Boolean vote = false;
-                System.out.println("broadcast");
                 if(chain_id == 1){
                     if (type.equals("PRECOMMIT")){
                         if(block.getId() == id_chain.size() && 
@@ -467,10 +500,6 @@ public class Node {
         if (args.length != 2) throw new Exception("Need 2 args: <index id> <port list> ");
         FileOutputStream f = new FileOutputStream("node.log",true);
         System.setOut(new PrintStream(f));
-        System.out.println("start challenge!");
-        System.out.println(args.length);
-        System.out.println(args[0]);
-        System.out.println(args[1]);
         Node node = new Node(args[0], args[1]);
 //        node.start();
     }
