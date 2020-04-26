@@ -8,6 +8,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.*;
 import java.io.*;
 import lib.MessageSender;
@@ -25,19 +30,57 @@ public class Server {
     private MessageSender messageSender = new MessageSender(1);
     private int blockchain_port;
     private List<String> candidates = new LinkedList<String>();
+    private PrivateKey pvt;
+    private PublicKey pub;
+    private String user_name;
 
-    Server(int server_port, int blockchain_port){
+    Server(int server_port, int blockchain_port) {
         try {
             this.server_skeleton = HttpServer.create(new InetSocketAddress(server_port), 0);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+        this.user_name = String.valueOf(server_port);
         this.blockchain_port = blockchain_port;
         this.server_skeleton.setExecutor(null);
+
+        registration_key();
         this.add_api();
         this.server_skeleton.start();
 
+    }
+
+    // Register public key pair with key blockchain
+    private void registration_key() {
+        try {
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(2048);
+            KeyPair kp = kpg.generateKeyPair();
+            pub = kp.getPublic();
+            pvt = kp.getPrivate();
+            String pub_str = Base64.getEncoder().encodeToString(pub.getEncoded());
+            Map<String,String> data = new HashMap<String,String>();
+            data.put("user_name",this.user_name);
+            data.put("public_key", pub_str);
+            MineBlockRequest request = new MineBlockRequest(1, data);
+            String uri = HOST_URI + String.valueOf(blockchain_port) + MINE_BLOCK_URI;
+            BlockReply reply = messageSender.post(uri, gson.toJson(request), BlockReply.class);
+            Block block = reply.getBlock();
+            AddBlockRequest add_request = new AddBlockRequest(1, block);
+            uri = HOST_URI + String.valueOf(blockchain_port) + ADD_BLOCK_URI;
+            Boolean status = false;
+            while(!status){
+                StatusReply add_reply = messageSender.post(uri, gson.toJson(add_request), StatusReply.class);
+                status = add_reply.getSuccess();
+            }
+            
+            
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
     }
 
     private void add_api(){
@@ -64,7 +107,9 @@ public class Server {
                 }
 
                 //Get current id chain
+                GetChainRequest chain_requst = new GetChainRequest(1);
                 
+
 
             }else{
                 respText = "The REST method should be POST for <service api>!\n";
