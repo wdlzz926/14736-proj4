@@ -29,21 +29,6 @@ public class Node {
     protected static final String ADD_BLOCK_URI = "/addblock";
     protected static final String BROADCAST_URI = "/broadcast";
 
-    protected HttpResponse<String> getResponse(String method, int port, Object requestObj)
-            throws IOException, InterruptedException {
-        System.out.println("getResponse");
-
-        HttpResponse<String> response;
-        HttpRequest request = HttpRequest.newBuilder().uri(URI.create("http://localhost:" + port + method))
-                .setHeader("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestObj))).build();
-        System.out.println("create request");
-
-        response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
-        System.out.println("get response");
-        return response;
-    }
-
     private HttpServer node_skeleton;
     protected Gson gson;
     private List<Integer> ports;

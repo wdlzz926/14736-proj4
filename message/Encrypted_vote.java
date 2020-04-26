@@ -14,6 +14,10 @@ public class Encrypted_vote {
 
     }
 
+    public int getChain_id() {
+        return chain_id;
+    }
+
     public String getUserName(){
         return this.user_name;
     }
