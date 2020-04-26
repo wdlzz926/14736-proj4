@@ -8,12 +8,20 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.*;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.SecretKeySpec;
+
 import java.io.*;
 import lib.MessageSender;
 import message.*;
@@ -60,8 +68,8 @@ public class Server {
             pub = kp.getPublic();
             pvt = kp.getPrivate();
             String pub_str = Base64.getEncoder().encodeToString(pub.getEncoded());
-            Map<String,String> data = new HashMap<String,String>();
-            data.put("user_name",this.user_name);
+            Map<String, String> data = new HashMap<String, String>();
+            data.put("user_name", this.user_name);
             data.put("public_key", pub_str);
             MineBlockRequest request = new MineBlockRequest(1, data);
             String uri = HOST_URI + String.valueOf(blockchain_port) + MINE_BLOCK_URI;
@@ -70,28 +78,28 @@ public class Server {
             AddBlockRequest add_request = new AddBlockRequest(1, block);
             uri = HOST_URI + String.valueOf(blockchain_port) + ADD_BLOCK_URI;
             Boolean status = false;
-            while(!status){
+            while (!status) {
                 StatusReply add_reply = messageSender.post(uri, gson.toJson(add_request), StatusReply.class);
                 status = add_reply.getSuccess();
             }
-            
-            
 
         } catch (Exception e) {
             e.printStackTrace();
         }
-        
+
     }
 
-    private void add_api(){
+    private void add_api() {
         this.becomeCandidate();
         this.getCandidate();
         this.castVote();
         this.countVote();
     }
 
-    private void becomeCandidate(){
+    private void becomeCandidate() {
         this.server_skeleton.createContext("/becomecandidate", (exchange -> {
+            FileOutputStream f = new FileOutputStream("voteserver.log", true);
+            System.setOut(new PrintStream(f));
             String respText = "";
             int returnCode = 200;
             if ("POST".equals(exchange.getRequestMethod())) {
@@ -106,12 +114,47 @@ public class Server {
                     return;
                 }
 
-                //Get current id chain
+                String candidate = bcr.getCandidateName();
+                // check if already candidate
+                if (candidates.contains(candidate)) {
+                    returnCode = 409;
+                    StatusReply reply = new StatusReply(false, "NodeAlreadyCandidate");
+                    respText = gson.toJson(reply);
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
+
+                // Get current id chain
                 GetChainRequest chain_requst = new GetChainRequest(1);
-                
+                String uri = HOST_URI + String.valueOf(blockchain_port) + GET_CHAIN_URI;
+                GetChainReply chain_reply;
+                try {
+                    chain_reply = messageSender.post(uri, gson.toJson(chain_requst), GetChainReply.class);
+                    List<Block> blocks = chain_reply.getBlocks();
+                    Boolean found = false;
+                    for (Block b : blocks) {
+                        if (candidate.equals(b.getData().get("user_name"))) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) {
+                        candidates.add(candidate);
+                        returnCode = 200;
+                        StatusReply reply = new StatusReply(true);
+                        respText = gson.toJson(reply);
 
+                    } else {
+                        returnCode = 422;
+                        StatusReply reply = new StatusReply(false, "CandidatePublicKeyUnknown");
+                        respText = gson.toJson(reply);
+                    }
 
-            }else{
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+            } else {
                 respText = "The REST method should be POST for <service api>!\n";
                 returnCode = 400;
             }
@@ -119,15 +162,80 @@ public class Server {
         }));
     }
 
-    private void getCandidate(){
+    private void getCandidate() {
         this.server_skeleton.createContext("/getcandidates", (exchange -> {
+            FileOutputStream f = new FileOutputStream("voteserver.log", true);
+            System.setOut(new PrintStream(f));
+            String respText = "";
+            int returnCode = 200;
+            if ("POST".equals(exchange.getRequestMethod())) {
+                GetCandidatesReply reply = new GetCandidatesReply(candidates);
+                respText = gson.toJson(reply);
+                returnCode = 200;
 
+            } else {
+                respText = "The REST method should be POST for <service api>!\n";
+                returnCode = 400;
+            }
+            this.generateResponseAndClose(exchange, respText, returnCode);
         }));
     }
 
-    private void castVote(){
+    private void castVote() {
         this.server_skeleton.createContext("/castvote", (exchange -> {
+            FileOutputStream f = new FileOutputStream("voteserver.log", true);
+            System.setOut(new PrintStream(f));
+            String respText = "";
+            int returnCode = 200;
+            if ("POST".equals(exchange.getRequestMethod())) {
+                CastVoteRequest cvr = null;
+                try {
+                    InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                    cvr = gson.fromJson(isr, CastVoteRequest.class);
+                } catch (Exception e) {
+                    respText = "Error during parse JSON object!\n";
+                    returnCode = 400;
+                    this.generateResponseAndClose(exchange, respText, returnCode);
+                    return;
+                }
 
+                String contents = cvr.getEncryptedVotes();
+                String session_key = cvr.getEncryptedSessionKey();
+
+                try {
+                    Cipher cipher = Cipher.getInstance("RSA");
+                    cipher.init(Cipher.DECRYPT_MODE, pvt);
+                    byte[] tmp = Base64.getDecoder().decode(session_key);
+                    byte[] key_bytes = cipher.doFinal(tmp);
+                    SecretKeySpec key = new SecretKeySpec(key_bytes,"AES");
+                    cipher = cipher.getInstance();
+
+
+                } catch (NoSuchAlgorithmException e) {
+                    System.out.println("invalid algo");
+                    e.printStackTrace();
+                } catch (NoSuchPaddingException e) {
+                    e.printStackTrace();
+                } catch (InvalidKeyException e) {
+                    System.out.println("invalid key");
+                    e.printStackTrace();
+                } catch (IllegalBlockSizeException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                } catch (BadPaddingException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+
+
+
+
+
+            }else{
+                respText = "The REST method should be POST for <service api>!\n";
+                returnCode = 400;
+            }
+            this.generateResponseAndClose(exchange, respText, returnCode);
         }));
     }
 
