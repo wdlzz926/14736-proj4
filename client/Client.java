@@ -42,7 +42,7 @@ public class Client {
     private PublicKey pub;
     private SecretKey secretKey;
     private String user_name;
-    private MessageSender messageSender = new MessageSender(1);
+    private MessageSender messageSender = new MessageSender(10);
 
     Client(String client, String server, String blockchain) {
 //        clientId = Integer.parseInt(client);

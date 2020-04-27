@@ -38,7 +38,7 @@ public class Server {
 
     private Gson gson = new Gson();
     private HttpServer server_skeleton;
-    private MessageSender messageSender = new MessageSender(1);
+    private MessageSender messageSender = new MessageSender(10);
     private int blockchain_port;
     private List<String> candidates = new LinkedList<String>();
     private Map<String,Integer> vote_count = new HashMap<String,Integer>();
@@ -66,6 +66,8 @@ public class Server {
 
     // Register public key pair with key blockchain
     private void registration_key() {
+        System.out.println("Start registration");
+        System.out.flush();
         try {
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
             kpg.initialize(2048);
@@ -77,9 +79,13 @@ public class Server {
             data.put("user_name", this.user_name);
             data.put("public_key", pub_str);
             MineBlockRequest request = new MineBlockRequest(1, data);
-            String uri = HOST_URI + String.valueOf(blockchain_port) + MINE_BLOCK_URI;
+            String uri = HOST_URI + blockchain_port + MINE_BLOCK_URI;
+            System.out.println(gson.toJson(request));
+            System.out.println(uri);
             BlockReply reply = messageSender.post(uri, gson.toJson(request), BlockReply.class);
             Block block = reply.getBlock();
+            System.out.println("Server info Block: "+block.toString());
+            System.out.flush();
             AddBlockRequest add_request = new AddBlockRequest(1, block);
             uri = HOST_URI + String.valueOf(blockchain_port) + ADD_BLOCK_URI;
             Boolean status = false;
@@ -89,7 +95,7 @@ public class Server {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(System.out);
         }
 
     }

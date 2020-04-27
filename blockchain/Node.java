@@ -165,7 +165,8 @@ public class Node {
             if (i == this.nodeId) {
                 continue;
             }
-            String uri = HOST_URI + ports.get(i) + BROADCAST_URI;
+            String uri = HOST_URI + ports.get(i) + GET_CHAIN_URI;
+            System.out.println(uri);
             GetChainRequest request = new GetChainRequest(chain_id);
             try {
                 GetChainReply reply = messageSender.post(uri, request, GetChainReply.class);
@@ -178,7 +179,7 @@ public class Node {
                 }
             } catch (Exception e) {
                 // TODO Auto-generated catch block
-                e.printStackTrace();
+                e.printStackTrace(System.out);
             }
         }
 
@@ -217,10 +218,14 @@ public class Node {
 
                 int chain_id = mineBlockRequest.getChainId();
                 Map<String, String> data = mineBlockRequest.getData();
+                System.out.println("request for "+data.get("user_name"));
+                System.out.flush();
 
                 if (chain_id == 1) {
                     synchronize_block_chain(1);
                     // id chain
+                    System.out.println("finished synchronize");
+                    System.out.flush();
                     Block block = new Block(id_chain.size(), data, System.currentTimeMillis(), 0,
                             id_chain.getLast().getHash(), "");
                     while (true) {
