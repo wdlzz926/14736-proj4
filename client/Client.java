@@ -32,6 +32,7 @@ public class Client {
     protected static final String MINE_BLOCK_URI = "/mineblock";
     protected static final String ADD_BLOCK_URI = "/addblock";
     protected static final String BROADCAST_URI = "/broadcast";
+    protected static final String CASTVOTE_URI = "/castvote";
 
     private HttpServer client_skeleton;
     protected Gson gson;
@@ -148,6 +149,8 @@ public class Client {
         this.client_skeleton.createContext("/startvote", (exchange -> {
             String respText = "";
             int returnCode = 200;
+            FileOutputStream f = new FileOutputStream("client.log",true);
+            System.setOut(new PrintStream(f));
             if ("POST".equals(exchange.getRequestMethod())) {
                 StartVoteRequest startVoteRequest = null;
                 try {
@@ -162,13 +165,14 @@ public class Client {
                 }
                 int chain_id = startVoteRequest.getChainId();
                 String candidate = startVoteRequest.getVoteFor();
-
+                System.out.println("vote for "+candidate);
+                System.out.flush();
                 String encrypted_vote = "\"user_name\":" + clientId + ",\n \"voted_for\": " + candidate;
                 byte[] sign_vote_byte = new byte[0];
                 try {
                     sign_vote_byte = sign(encrypted_vote);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    e.printStackTrace(System.out);
                 }
                 String sign_vote = Base64.getEncoder().encodeToString(sign_vote_byte);
 //                String sign_vote = new String(sign_vote_byte, StandardCharsets.UTF_8);
@@ -177,17 +181,18 @@ public class Client {
                 String encrypt_vote_content = encrypt_aes(vote_content_string);
                 String encrypt_session_key = null;
                 try {
-                    encrypt_session_key = encrypt_public(secretKey.toString());
+                    encrypt_session_key = encrypt_public(secretKey.getEncoded());
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    e.printStackTrace(System.out);
                 }
                 CastVoteRequest castVoteRequest = new CastVoteRequest(encrypt_vote_content, encrypt_session_key);
-                String uri = HOST_URI + blockchainId + HOST_URI;
+                String uri = HOST_URI + serverId + CASTVOTE_URI;
+                System.out.println(gson.toJson(castVoteRequest));
                 StatusReply statusReply = null;
                 try {
                     statusReply = messageSender.post(uri,gson.toJson(castVoteRequest), StatusReply.class);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    e.printStackTrace(System.out);
                 }
                 respText = gson.toJson(statusReply);
             } else {
@@ -198,7 +203,8 @@ public class Client {
         }));
     }
 
-    private String encrypt_public(String plain) throws Exception {
+    private String encrypt_public(byte[] encoded) throws Exception {
+        System.out.println("AES session key "+encoded);
         Cipher cipher = null;
         try {
             cipher = Cipher.getInstance("RSA");
@@ -208,12 +214,12 @@ public class Client {
         try {
             assert cipher != null;
             PublicKey publicKey = getPulicKey();
+            System.out.println("Server pub key "+publicKey.getEncoded());
             cipher.init(Cipher.ENCRYPT_MODE, publicKey);
         } catch (InvalidKeyException e) {
             e.printStackTrace();
         }
-        byte[] input = plain.getBytes();
-        cipher.update(input);
+        cipher.update(encoded);
         byte[] cipherText = new byte[0];
         try {
             cipherText = cipher.doFinal();

@@ -75,6 +75,7 @@ public class Server {
             KeyPair kp = kpg.generateKeyPair();
             pub = kp.getPublic();
             pvt = kp.getPrivate();
+            System.out.println("pub key "+pub.getEncoded());
             String pub_str = Base64.getEncoder().encodeToString(pub.getEncoded());
             Map<String, String> data = new HashMap<String, String>();
             data.put("user_name", this.user_name);
@@ -269,6 +270,8 @@ public class Server {
 
                 String contents = cvr.getEncryptedVotes();
                 String session_key = cvr.getEncryptedSessionKey();
+                System.out.println(contents);
+                System.out.flush();
 
                 try {
                     Cipher cipher = Cipher.getInstance("RSA");
@@ -276,17 +279,20 @@ public class Server {
                     byte[] tmp = Base64.getDecoder().decode(session_key);
                     byte[] key_bytes = cipher.doFinal(tmp);
                     SecretKeySpec key = new SecretKeySpec(key_bytes,"AES");
+                    System.out.println("session key "+key_bytes);
                     cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
                     cipher.init(Cipher.DECRYPT_MODE,key);
                     String decrypt_contents = new String(cipher.doFinal(Base64.getDecoder().decode(contents)));
                     Encrypted_vote vote = gson.fromJson(decrypt_contents, Encrypted_vote.class);
-                    
+                    System.out.println(decrypt_contents);
+                    System.out.flush();
                     //check signature
                     PublicKey client_public = getPulicKey(vote.getUserName());
                     Signature sign = Signature.getInstance("SHA1withRSA");
                     sign.initVerify(client_public);
                     byte[] signature = Base64.getDecoder().decode(vote.getSignature());
                     Boolean verify = sign.verify(signature);
+                    System.out.println("signature verified");
                     
                     if(!verify){
                         //wrong signature
@@ -294,6 +300,7 @@ public class Server {
                     }
 
                     String user_name = vote.getUserName();
+                    System.out.println("Voter "+user_name);
                     if(voted_client.contains(user_name)){
                         returnCode = 409;
                         StatusReply reply = new StatusReply(false, "DuplicateVote");
@@ -303,6 +310,7 @@ public class Server {
                     }
                     
                     String vote_candidate = vote.getVotedFor();
+                    System.out.println("Voted for "+vote_candidate);
                     if(candidates.contains(vote_candidate)){
                         int cur_vote = vote_count.get(vote_candidate);
                         vote_count.put(vote_candidate, cur_vote+1);
@@ -324,7 +332,7 @@ public class Server {
                     returnCode = 422;
                     StatusReply reply = new StatusReply(false, "WrongDuringDecryption");
                     respText = gson.toJson(reply);
-                    e.printStackTrace();
+                    e.printStackTrace(System.out);
                 }
 
 
