@@ -139,7 +139,8 @@ public class Client {
         } catch (IllegalBlockSizeException | BadPaddingException e) {
             e.printStackTrace();
         }
-        String send = new String(cipherText, StandardCharsets.UTF_8);
+        String send = Base64.getEncoder().encodeToString(cipherText);
+//        String send = new String(cipherText, StandardCharsets.UTF_8);
         return send;
     }
 
@@ -169,7 +170,8 @@ public class Client {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                String sign_vote = new String(sign_vote_byte, StandardCharsets.UTF_8);
+                String sign_vote = Base64.getEncoder().encodeToString(sign_vote_byte);
+//                String sign_vote = new String(sign_vote_byte, StandardCharsets.UTF_8);
                 Encrypted_vote vote_content = new Encrypted_vote(clientId, candidate, sign_vote);
                 String vote_content_string = gson.toJson(vote_content);
                 String encrypt_vote_content = encrypt_aes(vote_content_string);
@@ -218,7 +220,8 @@ public class Client {
         } catch (IllegalBlockSizeException | BadPaddingException e) {
             e.printStackTrace();
         }
-        String send = new String(cipherText, StandardCharsets.UTF_8);
+        String send = Base64.getEncoder().encodeToString(cipherText);
+//        String send = new String(cipherText, StandardCharsets.UTF_8);
         return send;
     }
 
@@ -227,7 +230,6 @@ public class Client {
         GetChainRequest chain_requst = new GetChainRequest(1);
         GetChainReply chain_reply = messageSender.post(uri, gson.toJson(chain_requst), GetChainReply.class);
         List<Block> blocks = chain_reply.getBlocks();
-//        Boolean found = false;
         for (Block b : blocks) {
             if (serverId.equals(b.getData().get("user_name"))) {
                 String publickey = b.getData().get("public_key");

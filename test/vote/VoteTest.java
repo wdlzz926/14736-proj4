@@ -279,6 +279,7 @@ abstract class VoteTest extends Test
         try
         {
             keyChain = sender.post(getChainURI, request, GetChainReply.class);
+//            System.out.println("keyChain.getChainLength()" + keyChain.getChainLength());
             if (keyChain == null) throw new Exception();
         }
         catch (Exception e)
