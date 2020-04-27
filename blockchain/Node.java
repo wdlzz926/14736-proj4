@@ -22,6 +22,7 @@ import java.net.http.HttpResponse;
 import lib.MessageSender;
 import message.*;
 
+
 public class Node {
     protected static final String HOST_URI = "http://127.0.0.1:";
     protected static final String GET_CHAIN_URI = "/getchain";
@@ -36,6 +37,7 @@ public class Node {
     private LinkedList<Block> id_chain = new LinkedList<Block>();
     private LinkedList<Block> vote_chain = new LinkedList<Block>();
     private MessageSender messageSender = new MessageSender(1);
+    private Boolean sleep = false;
 
     Node(String node_id, String port_list) {
         nodeId = Integer.parseInt(node_id);
@@ -51,7 +53,7 @@ public class Node {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        this.node_skeleton.setExecutor(null);
+        this.node_skeleton.setExecutor(Executors.newCachedThreadPool());
 
         this.add_node_api();
         this.id_chain.add(new Block());
@@ -86,12 +88,14 @@ public class Node {
                 int timeout = sleepRequest.getTimeout();
                 StatusReply statusReply = new StatusReply(true, "");
                 respText = gson.toJson(statusReply);
+                this.sleep = true;
                 this.generateResponseAndClose(exchange, respText, returnCode);
                 try {
                     Thread.sleep(1000 * timeout);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
                 }
+                this.sleep = false;
             } else {
                 respText = "The REST method should be POST for <service api>!\n";
                 returnCode = 400;
@@ -105,6 +109,14 @@ public class Node {
         this.node_skeleton.createContext("/getchain", (exchange -> {
             String respText = "";
             int returnCode = 200;
+
+            if(this.sleep){
+                returnCode = 400;
+                respText = gson.toJson(new StatusReply(false));
+                this.generateResponseAndClose(exchange, respText, returnCode);
+                return;
+           }
+
             if ("POST".equals(exchange.getRequestMethod())) {
                 GetChainRequest getChainRequest = null;
                 try {
@@ -181,6 +193,14 @@ public class Node {
             System.setOut(new PrintStream(f));
             String respText = "";
             int returnCode = 200;
+
+            if(this.sleep){
+                returnCode = 400;
+                respText = gson.toJson(new StatusReply(false));
+                this.generateResponseAndClose(exchange, respText, returnCode);
+                return;
+           }
+           
             if ("POST".equals(exchange.getRequestMethod())) {
                 MineBlockRequest mineBlockRequest = null;
                 try {
@@ -218,7 +238,9 @@ public class Node {
 //                    }
                     BlockReply reply = new BlockReply(chain_id, block);
                     respText = gson.toJson(reply);
-//                    returnCode = 200;
+                    System.out.println(respText);
+                    System.out.flush();
+                    returnCode = 200;
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
 
@@ -236,7 +258,7 @@ public class Node {
 //                    }
                     BlockReply reply = new BlockReply(chain_id, block);
                     respText = gson.toJson(reply);
-//                    returnCode = 200;
+                    returnCode = 200;
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 } else {
@@ -258,6 +280,13 @@ public class Node {
         this.node_skeleton.createContext("/addblock", (exchange -> {
             String respText = "";
             int returnCode = 200;
+
+            if(this.sleep){
+                returnCode = 400;
+                respText = gson.toJson(new StatusReply(false));
+                this.generateResponseAndClose(exchange, respText, returnCode);
+                return;
+           }
             if ("POST".equals(exchange.getRequestMethod())) {
                 AddBlockRequest addBlockRequest = null;
                 try {
@@ -275,7 +304,7 @@ public class Node {
                 Block block = addBlockRequest.getBlock();
                 LinkedList<Block> block_chain;
 
-                // System.out.println();
+                System.out.println("Get Request "+block.toString());
 
                 int vote = 1;
                 Boolean valid = false;
@@ -388,6 +417,13 @@ public class Node {
         this.node_skeleton.createContext("/broadcast", (exchange -> {
             String respText = "";
             int returnCode = 200;
+
+            if(this.sleep){
+                returnCode = 400;
+                respText = gson.toJson(new StatusReply(false));
+                this.generateResponseAndClose(exchange, respText, returnCode);
+                return;
+           }
             if ("POST".equals(exchange.getRequestMethod())) {
                 BroadcastRequest broadcastRequest = null;
                 try {
@@ -400,7 +436,7 @@ public class Node {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 }
-                System.out.println("start broadcast");
+                // System.out.println("start broadcast");
                 int chain_id = broadcastRequest.getChainId();
                 String type = broadcastRequest.getRequestType();
                 Block block = broadcastRequest.getBlock();
