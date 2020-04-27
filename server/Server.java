@@ -41,7 +41,7 @@ public class Server {
     private MessageSender messageSender = new MessageSender(20);
     private int blockchain_port;
     private List<String> candidates = new LinkedList<String>();
-    private Map<String,Integer> vote_count = new HashMap<String,Integer>();
+    private Map<String, Integer> vote_count = new HashMap<String, Integer>();
     private Set<String> voted_client = new HashSet<String>();
     private PrivateKey pvt;
     private PublicKey pub;
@@ -59,7 +59,6 @@ public class Server {
         }
 
         this.server_skeleton.setExecutor(null);
-
 
         this.add_api();
         this.server_skeleton.start();
@@ -86,7 +85,7 @@ public class Server {
             System.out.println(uri);
             BlockReply reply = messageSender.post(uri, gson.toJson(request), BlockReply.class);
             Block block = reply.getBlock();
-            System.out.println("Server info Block: "+block.toString());
+            System.out.println("Server info Block: " + block.toString());
             System.out.flush();
             AddBlockRequest add_request = new AddBlockRequest(1, block);
             uri = HOST_URI + String.valueOf(blockchain_port) + ADD_BLOCK_URI;
@@ -153,7 +152,7 @@ public class Server {
                     }
                     if (found) {
                         candidates.add(candidate);
-                        vote_count.put(candidate,0);
+                        vote_count.put(candidate, 0);
                         returnCode = 200;
                         StatusReply reply = new StatusReply(true);
                         respText = gson.toJson(reply);
@@ -194,6 +193,61 @@ public class Server {
             this.generateResponseAndClose(exchange, respText, returnCode);
         }));
     }
+
+    // add vote to vote blockchain
+    private void addVote(String voter, String vote, PublicKey voter_pub) {
+        Cipher cipher = null;
+        try {
+            cipher = Cipher.getInstance("RSA");
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+            e.printStackTrace();
+        }
+        try {
+            assert cipher != null;
+            cipher.init(Cipher.ENCRYPT_MODE, voter_pub);
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+
+        byte[] input = voter.getBytes();
+        cipher.update(input);
+        String output = "";
+        try {
+            output = Base64.getEncoder().encodeToString(cipher.doFinal());
+        } catch (IllegalBlockSizeException | BadPaddingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        Map<String, String> data = new HashMap<String, String>();
+        data.put("vote", vote);
+        data.put("voter_credential", output);
+
+        try {
+        MineBlockRequest request = new MineBlockRequest(2, data);
+        String uri = HOST_URI + blockchain_port + MINE_BLOCK_URI;
+        // System.out.println(gson.toJson(request));
+        // System.out.println(uri);
+        BlockReply reply = messageSender.post(uri, gson.toJson(request), BlockReply.class); 
+        Block block = reply.getBlock();
+        // System.out.println("Server info Block: "+block.toString());
+        // System.out.flush();
+        AddBlockRequest add_request = new AddBlockRequest(2, block);
+        uri = HOST_URI + String.valueOf(blockchain_port) + ADD_BLOCK_URI;
+        Boolean status = false;
+        while (!status) {
+            StatusReply add_reply = messageSender.post(uri, gson.toJson(add_request), StatusReply.class);
+            status = add_reply.getSuccess();
+        }
+
+        } catch (Exception e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+    }
+
+        
+    }
+
 
     private void castVote() {
         this.server_skeleton.createContext("/castvote", (exchange -> {
@@ -255,6 +309,7 @@ public class Server {
                         returnCode = 200;
                         StatusReply reply = new StatusReply(true);
                         respText = gson.toJson(reply);
+                        addVote(user_name,vote_candidate,client_public);
                     }else{
                         returnCode = 422;
                         StatusReply reply = new StatusReply(false, "InvalidCandidate");
