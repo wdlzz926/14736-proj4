@@ -86,12 +86,8 @@ public class Server {
             data.put("public_key", pub_str);
             MineBlockRequest request = new MineBlockRequest(1, data);
             String uri = HOST_URI + blockchain_port + MINE_BLOCK_URI;
-            System.out.println(gson.toJson(request));
-            System.out.println(uri);
             BlockReply reply = messageSender.post(uri, gson.toJson(request), BlockReply.class);
             Block block = reply.getBlock();
-            System.out.println("Server info Block: " + block.toString());
-            System.out.flush();
             AddBlockRequest add_request = new AddBlockRequest(1, block);
             uri = HOST_URI + String.valueOf(blockchain_port) + ADD_BLOCK_URI;
             Boolean status = false;
@@ -274,8 +270,8 @@ public class Server {
 
                 String contents = cvr.getEncryptedVotes();
                 String session_key = cvr.getEncryptedSessionKey();
-                System.out.println(contents);
-                System.out.flush();
+                // System.out.println(contents);
+                // System.out.flush();
 
                 try {
                     Cipher cipher = Cipher.getInstance("RSA");
@@ -297,6 +293,8 @@ public class Server {
                     Signature sign = Signature.getInstance("SHA1withRSA");
                     sign.initVerify(client_public);
                     byte[] signature = Base64.getDecoder().decode(vote.getSignature());
+                    String sign_str = "\"user_name\":" + vote.getUserName() + ",\n \"voted_for\": " + vote.getVotedFor();
+                    sign.update(sign_str.getBytes());
                     Boolean verify = sign.verify(signature);
                     System.out.println("signature verified");
                     
@@ -320,6 +318,7 @@ public class Server {
                     if(candidates.contains(vote_candidate)){
                         int cur_vote = vote_count.get(vote_candidate);
                         vote_count.put(vote_candidate, cur_vote+1);
+                        voted_client.add(user_name);
                         returnCode = 200;
                         StatusReply reply = new StatusReply(true);
                         respText = gson.toJson(reply);
