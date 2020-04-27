@@ -50,6 +50,7 @@ public class Client {
         serverId = server;
         blockchainId = Integer.parseInt(blockchain);
         this.gson = new Gson();
+        registration_rsa_key();
         try {
             this.client_skeleton = HttpServer.create(new InetSocketAddress(Integer.parseInt(client)), 0);
         } catch (IOException e) {
@@ -57,7 +58,7 @@ public class Client {
             e.printStackTrace();
         }
         this.client_skeleton.setExecutor(null);
-        registration_rsa_key();
+
         registration_aes_key();
         this.add_client_api();
 //        this.id_chain.add(new Block());
@@ -102,7 +103,7 @@ public class Client {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(System.out);
         }
     }
 

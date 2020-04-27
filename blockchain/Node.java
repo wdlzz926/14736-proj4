@@ -53,7 +53,8 @@ public class Node {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        this.node_skeleton.setExecutor(Executors.newCachedThreadPool());
+        // this.node_skeleton.setExecutor(Executors.newCachedThreadPool());
+        this.node_skeleton.setExecutor(null);
 
         this.add_node_api();
         this.id_chain.add(new Block());
@@ -232,6 +233,8 @@ public class Node {
                         String hash = Block.computeHash(block);
                         if (hash.startsWith("00000")) {
                             block.setHash(hash);
+                            System.out.println("mine finished");
+                            System.out.flush();
                             break;
                         } else {
                             block.nonceIncrement();

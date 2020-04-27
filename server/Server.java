@@ -38,7 +38,7 @@ public class Server {
 
     private Gson gson = new Gson();
     private HttpServer server_skeleton;
-    private MessageSender messageSender = new MessageSender(10);
+    private MessageSender messageSender = new MessageSender(20);
     private int blockchain_port;
     private List<String> candidates = new LinkedList<String>();
     private Map<String,Integer> vote_count = new HashMap<String,Integer>();
@@ -48,17 +48,19 @@ public class Server {
     private String user_name;
 
     Server(int server_port, int blockchain_port) {
+        this.user_name = String.valueOf(server_port);
+        this.blockchain_port = blockchain_port;
+        registration_key();
         try {
             this.server_skeleton = HttpServer.create(new InetSocketAddress(server_port), 0);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        this.user_name = String.valueOf(server_port);
-        this.blockchain_port = blockchain_port;
+
         this.server_skeleton.setExecutor(null);
 
-        registration_key();
+
         this.add_api();
         this.server_skeleton.start();
 
