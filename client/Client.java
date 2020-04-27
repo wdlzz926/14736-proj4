@@ -14,6 +14,9 @@ import blockchain.Node;
 import com.google.gson.Gson;
 import java.util.concurrent.Executors;
 import com.sun.net.httpserver.HttpServer;
+
+import org.apache.commons.codec.binary.Hex;
+
 import com.sun.net.httpserver.HttpExchange;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -25,6 +28,7 @@ import lib.MessageSender;
 import message.*;
 
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
 
 public class Client {
     protected static final String HOST_URI = "http://127.0.0.1:";
@@ -127,16 +131,18 @@ public class Client {
         }
         try {
             assert cipher != null;
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
+            byte[] iv = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+            IvParameterSpec ivspec = new IvParameterSpec(iv);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey,ivspec);
+        } catch (InvalidKeyException | InvalidAlgorithmParameterException e) {
+            e.printStackTrace(System.out);
         }
 
-        byte[] input = plain.getBytes();
-        cipher.update(input);
+        // byte[] input = plain.getBytes();
+        // cipher.update(input);
         byte[] cipherText = new byte[0];
         try {
-            cipherText = cipher.doFinal();
+            cipherText = cipher.doFinal(plain.getBytes());
         } catch (IllegalBlockSizeException | BadPaddingException e) {
             e.printStackTrace();
         }
@@ -204,7 +210,7 @@ public class Client {
     }
 
     private String encrypt_public(byte[] encoded) throws Exception {
-        System.out.println("AES session key "+encoded);
+        System.out.println("AES session key "+Hex.encodeHexString(encoded));
         Cipher cipher = null;
         try {
             cipher = Cipher.getInstance("RSA");
@@ -219,15 +225,19 @@ public class Client {
         } catch (InvalidKeyException e) {
             e.printStackTrace();
         }
+        // String test = "abcdefg";
+        // System.out.println("test bytes "+test.getBytes());
+        // System.out.flush();
         cipher.update(encoded);
         byte[] cipherText = new byte[0];
         try {
             cipherText = cipher.doFinal();
         } catch (IllegalBlockSizeException | BadPaddingException e) {
-            e.printStackTrace();
+            e.printStackTrace(System.out);
         }
         String send = Base64.getEncoder().encodeToString(cipherText);
-//        String send = new String(cipherText, StandardCharsets.UTF_8);
+        System.out.println("encoded key "+ send);
+        System.out.flush();
         return send;
     }
 

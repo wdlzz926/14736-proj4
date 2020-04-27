@@ -2,6 +2,9 @@ package server;
 
 import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpServer;
+
+import org.apache.commons.codec.binary.Hex;
+
 import com.sun.net.httpserver.HttpExchange;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -23,6 +26,7 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import java.io.*;
@@ -278,11 +282,13 @@ public class Server {
                     cipher.init(Cipher.DECRYPT_MODE, pvt);
                     byte[] tmp = Base64.getDecoder().decode(session_key);
                     byte[] key_bytes = cipher.doFinal(tmp);
+                    System.out.println("session key "+Hex.encodeHexString(key_bytes));
                     SecretKeySpec key = new SecretKeySpec(key_bytes,"AES");
-                    System.out.println("session key "+key_bytes);
-                    cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-                    cipher.init(Cipher.DECRYPT_MODE,key);
-                    String decrypt_contents = new String(cipher.doFinal(Base64.getDecoder().decode(contents)));
+                    Cipher aes_cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+                    byte[] iv = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+                    IvParameterSpec ivspec = new IvParameterSpec(iv);
+                    aes_cipher.init(Cipher.DECRYPT_MODE,key,ivspec);
+                    String decrypt_contents = new String(aes_cipher.doFinal(Base64.getDecoder().decode(contents)));
                     Encrypted_vote vote = gson.fromJson(decrypt_contents, Encrypted_vote.class);
                     System.out.println(decrypt_contents);
                     System.out.flush();
