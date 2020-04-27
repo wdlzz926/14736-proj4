@@ -53,8 +53,8 @@ public class Node {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        // this.node_skeleton.setExecutor(Executors.newCachedThreadPool());
-        this.node_skeleton.setExecutor(null);
+        this.node_skeleton.setExecutor(Executors.newCachedThreadPool());
+        // this.node_skeleton.setExecutor(null);
 
         this.add_node_api();
         this.id_chain.add(new Block());
