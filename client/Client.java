@@ -1,41 +1,27 @@
 package client;
 import java.io.*;
-import java.lang.reflect.Array;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.security.*;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.sql.Timestamp;
 import java.util.*;
-
-import blockchain.Node;
 import com.google.gson.Gson;
-import java.util.concurrent.Executors;
 import com.sun.net.httpserver.HttpServer;
-
 import org.apache.commons.codec.binary.Hex;
-
 import com.sun.net.httpserver.HttpExchange;
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-
 import lib.MessageSender;
 import message.*;
-
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 
+/**
+ * client class:  all types of messages that a client node shall handle.
+ */
 public class Client {
     protected static final String HOST_URI = "http://127.0.0.1:";
     protected static final String GET_CHAIN_URI = "/getchain";
     protected static final String MINE_BLOCK_URI = "/mineblock";
     protected static final String ADD_BLOCK_URI = "/addblock";
-    protected static final String BROADCAST_URI = "/broadcast";
     protected static final String CASTVOTE_URI = "/castvote";
 
     private HttpServer client_skeleton;
@@ -46,11 +32,15 @@ public class Client {
     private PrivateKey pvt;
     private PublicKey pub;
     private SecretKey secretKey;
-    private String user_name;
     private MessageSender messageSender = new MessageSender(10);
 
+    /**
+     * constructor
+     * @param client: client port
+     * @param server: server port
+     * @param blockchain: blockchain id
+     */
     Client(String client, String server, String blockchain) {
-//        clientId = Integer.parseInt(client);
         clientId = client;
         serverId = server;
         blockchainId = Integer.parseInt(blockchain);
@@ -59,18 +49,18 @@ public class Client {
         try {
             this.client_skeleton = HttpServer.create(new InetSocketAddress(Integer.parseInt(client)), 0);
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         this.client_skeleton.setExecutor(null);
 
         registration_aes_key();
         this.add_client_api();
-//        this.id_chain.add(new Block());
-//        this.vote_chain.add(new Block());
         this.client_skeleton.start();
     }
 
+    /**
+     * create session key.
+     */
     private void registration_aes_key() {
         try {
             KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
@@ -83,7 +73,9 @@ public class Client {
         }
     }
 
-    // Register public key pair with key blockchain
+    /**
+     * Register public key pair with key blockchain.
+     */
     private void registration_rsa_key() {
         try {
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
@@ -116,12 +108,24 @@ public class Client {
         this.startVote();
     }
 
+    /**
+     * sign digital signature.
+     * @param data the data need to be sign.
+     * @return signed data.
+     * @throws Exception
+     */
     public byte[] sign(String data) throws Exception{
         Signature rsa = Signature.getInstance("SHA1withRSA");
         rsa.initSign(pvt);
         rsa.update(data.getBytes());
         return rsa.sign();
     }
+
+    /**
+     * using session key to encrypt data.
+     * @param plain plain data
+     * @return encrypted data.
+     */
     private String encrypt_aes(String plain) {
         Cipher cipher = null;
         try {
@@ -137,9 +141,6 @@ public class Client {
         } catch (InvalidKeyException | InvalidAlgorithmParameterException e) {
             e.printStackTrace(System.out);
         }
-
-        // byte[] input = plain.getBytes();
-        // cipher.update(input);
         byte[] cipherText = new byte[0];
         try {
             cipherText = cipher.doFinal(plain.getBytes());
@@ -147,10 +148,12 @@ public class Client {
             e.printStackTrace();
         }
         String send = Base64.getEncoder().encodeToString(cipherText);
-//        String send = new String(cipherText, StandardCharsets.UTF_8);
         return send;
     }
 
+    /**
+     * start vote API: Cast a vote to the requested candidate after the appropriate encryptions in place.
+     */
     private void startVote() {
         this.client_skeleton.createContext("/startvote", (exchange -> {
             String respText = "";
@@ -169,10 +172,7 @@ public class Client {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 }
-                int chain_id = startVoteRequest.getChainId();
                 String candidate = startVoteRequest.getVoteFor();
-                System.out.println("vote for "+candidate);
-                System.out.flush();
                 String encrypted_vote = "\"user_name\":" + clientId + ",\n \"voted_for\": " + candidate;
                 byte[] sign_vote_byte = new byte[0];
                 try {
@@ -181,7 +181,6 @@ public class Client {
                     e.printStackTrace(System.out);
                 }
                 String sign_vote = Base64.getEncoder().encodeToString(sign_vote_byte);
-//                String sign_vote = new String(sign_vote_byte, StandardCharsets.UTF_8);
                 Encrypted_vote vote_content = new Encrypted_vote(clientId, candidate, sign_vote);
                 String vote_content_string = gson.toJson(vote_content);
                 String encrypt_vote_content = encrypt_aes(vote_content_string);
@@ -193,7 +192,6 @@ public class Client {
                 }
                 CastVoteRequest castVoteRequest = new CastVoteRequest(encrypt_vote_content, encrypt_session_key);
                 String uri = HOST_URI + serverId + CASTVOTE_URI;
-                System.out.println(gson.toJson(castVoteRequest));
                 StatusReply statusReply = null;
                 try {
                     statusReply = messageSender.post(uri,gson.toJson(castVoteRequest), StatusReply.class);
@@ -209,8 +207,13 @@ public class Client {
         }));
     }
 
+    /**
+     * using server public key to encrypt data.
+     * @param encoded data need to be encrypt
+     * @return encrypt data.
+     * @throws Exception
+     */
     private String encrypt_public(byte[] encoded) throws Exception {
-        System.out.println("AES session key "+Hex.encodeHexString(encoded));
         Cipher cipher = null;
         try {
             cipher = Cipher.getInstance("RSA");
@@ -220,14 +223,10 @@ public class Client {
         try {
             assert cipher != null;
             PublicKey publicKey = getPulicKey();
-            System.out.println("Server pub key "+publicKey.getEncoded());
             cipher.init(Cipher.ENCRYPT_MODE, publicKey);
         } catch (InvalidKeyException e) {
             e.printStackTrace();
         }
-        // String test = "abcdefg";
-        // System.out.println("test bytes "+test.getBytes());
-        // System.out.flush();
         cipher.update(encoded);
         byte[] cipherText = new byte[0];
         try {
@@ -236,11 +235,14 @@ public class Client {
             e.printStackTrace(System.out);
         }
         String send = Base64.getEncoder().encodeToString(cipherText);
-        System.out.println("encoded key "+ send);
-        System.out.flush();
         return send;
     }
 
+    /**
+     * get server public key.
+     * @return server public key
+     * @throws Exception
+     */
     private PublicKey getPulicKey() throws Exception {
         String uri = HOST_URI + blockchainId + GET_CHAIN_URI;
         GetChainRequest chain_requst = new GetChainRequest(1);

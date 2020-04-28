@@ -141,7 +141,6 @@ public class CastVoteTest extends VoteTest
             int candidate_index = rand.nextInt(nCandidates);
             String candidate = candidates.get(candidate_index);
 
-
             // ask a client to vote for an invalid candidate
             boolean invalid_vote_success = voteForCandidate(voter_port, "covid-19");
             if (invalid_vote_success)

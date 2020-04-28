@@ -1,3 +1,11 @@
+/**
+ *
+ *      File Name -     Encrypted_vote.java
+ *      Brief -
+ *
+ *          The request format for Encrypted_vote call
+ */
+
 package message;
 
 public class Encrypted_vote {

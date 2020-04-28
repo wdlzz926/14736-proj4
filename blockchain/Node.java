@@ -1,12 +1,6 @@
 package blockchain;
 
 import java.io.*;
-import java.lang.reflect.Array;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.sql.Timestamp;
 import java.util.*;
 
 import com.google.gson.Gson;
@@ -14,20 +8,16 @@ import java.util.concurrent.Executors;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpExchange;
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 
 import lib.MessageSender;
 import message.*;
 
-
+/**
+ * Node class: API specifies all types of messages that a blockchain node shall handle
+ */
 public class Node {
     protected static final String HOST_URI = "http://127.0.0.1:";
     protected static final String GET_CHAIN_URI = "/getchain";
-    protected static final String MINE_BLOCK_URI = "/mineblock";
-    protected static final String ADD_BLOCK_URI = "/addblock";
     protected static final String BROADCAST_URI = "/broadcast";
 
     private HttpServer node_skeleton;
@@ -39,6 +29,11 @@ public class Node {
     private MessageSender messageSender = new MessageSender(1);
     private Boolean sleep = false;
 
+    /**
+     * Constructor of Node
+     * @param node_id node id
+     * @param port_list port list
+     */
     Node(String node_id, String port_list) {
         nodeId = Integer.parseInt(node_id);
         List<String> portstr = Arrays.asList(port_list.split(","));
@@ -54,7 +49,6 @@ public class Node {
             e.printStackTrace();
         }
         this.node_skeleton.setExecutor(Executors.newCachedThreadPool());
-        // this.node_skeleton.setExecutor(null);
 
         this.add_node_api();
         this.id_chain.add(new Block());
@@ -70,6 +64,9 @@ public class Node {
         this.sleep();
     }
 
+    /**
+     * sleep API: Put a node to sleep state to simulate network disconnection.
+     */
     private void sleep() {
         this.node_skeleton.createContext("/sleep", (exchange -> {
             String respText = "";
@@ -106,6 +103,9 @@ public class Node {
         }));
     }
 
+    /**
+     * get chain API, Request from users or peers to get the local copy of a blockchain on a node.
+     */
     private void getBlockChain() {
         this.node_skeleton.createContext("/getchain", (exchange -> {
             String respText = "";
@@ -155,6 +155,10 @@ public class Node {
 
     }
 
+    /**
+     * helper function to synchronize block chain.
+     * @param chain_id
+     */
     private void synchronize_block_chain(int chain_id) {
         LinkedList<Block> block_chain;
         if (chain_id == 1) {
@@ -167,7 +171,6 @@ public class Node {
                 continue;
             }
             String uri = HOST_URI + ports.get(i) + GET_CHAIN_URI;
-            System.out.println(uri);
             GetChainRequest request = new GetChainRequest(chain_id);
             try {
                 GetChainReply reply = messageSender.post(uri, request, GetChainReply.class);
@@ -175,20 +178,17 @@ public class Node {
                     //need to update
                     block_chain.clear();
                     block_chain.addAll(reply.getBlocks());
-                    System.out.println("Node "+ String.valueOf(nodeId)+" synchronized from "+String.valueOf(i));
-                    System.out.flush();
                 }
             } catch (Exception e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace(System.out);
             }
         }
-
-
-
-
-
     }
+
+    /**
+     * mine block API: Request from a user to mine a new block for a blockchain.
+     */
     private void mineBlock() {
         this.node_skeleton.createContext("/mineblock", (exchange -> {
             FileOutputStream f = new FileOutputStream("node.log",true);
@@ -219,35 +219,22 @@ public class Node {
 
                 int chain_id = mineBlockRequest.getChainId();
                 Map<String, String> data = mineBlockRequest.getData();
-                System.out.println("request for "+data.get("user_name"));
-                System.out.flush();
-
                 if (chain_id == 1) {
                     synchronize_block_chain(1);
                     // id chain
-                    System.out.println("finished synchronize");
-                    System.out.flush();
                     Block block = new Block(id_chain.size(), data, System.currentTimeMillis(), 0,
                             id_chain.getLast().getHash(), "");
                     while (true) {
                         String hash = Block.computeHash(block);
                         if (hash.startsWith("00000")) {
                             block.setHash(hash);
-                            System.out.println("mine finished");
-                            System.out.flush();
                             break;
                         } else {
                             block.nonceIncrement();
                         }
                     }
-//                    id_chain.add(block);
-//                    if (id_chain.size() == 2 &&  id_chain.getFirst().getHash().equals( "dummy")) {
-//                        id_chain.removeFirst();
-//                    }
                     BlockReply reply = new BlockReply(chain_id, block);
                     respText = gson.toJson(reply);
-                    System.out.println(respText);
-                    System.out.flush();
                     returnCode = 200;
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
@@ -259,11 +246,6 @@ public class Node {
                             vote_chain.getLast().getHash(), "");
                     String hash = Block.computeHash(block);
                     block.setHash(hash);
-//                    vote_chain.add(block);
-//                    first one
-//                    if (vote_chain.size() == 2 &&  vote_chain.getFirst().getHash().equals( "dummy")) {
-//                        vote_chain.removeFirst();
-//                    }
                     BlockReply reply = new BlockReply(chain_id, block);
                     respText = gson.toJson(reply);
                     returnCode = 200;
@@ -284,6 +266,9 @@ public class Node {
 
     }
 
+    /**
+     * Add block API: Request from client to add a block to the blockchain.
+     */
     private void addBlock() {
         this.node_skeleton.createContext("/addblock", (exchange -> {
             String respText = "";
@@ -311,14 +296,9 @@ public class Node {
                 int chain_id = addBlockRequest.getChainId();
                 Block block = addBlockRequest.getBlock();
                 LinkedList<Block> block_chain;
-
-                System.out.println("Get Request "+block.toString());
-
                 int vote = 1;
                 Boolean valid = false;
                 if (chain_id == 1) {
-                    System.out.println(id_chain.getLast().getHash());
-                    System.out.println(block.getPreviousHash());
                     if(block.getId() == id_chain.size() &&
                                block.getPreviousHash().equals( id_chain.getLast().getHash()) &&
                                block.getHash().startsWith("00000")){
@@ -343,20 +323,14 @@ public class Node {
                     StatusReply reply = new StatusReply(false);
                     respText = gson.toJson(reply);
                     this.generateResponseAndClose(exchange, respText, returnCode);
-                    System.out.println("invalid with local blockChain");
-                    System.out.flush();
                     return;
                 }
-//                System.out.println("start precommit");
                 // PRECOMMIT
                 for (int i = 0; i < ports.size(); i++) {
                     if (i == this.nodeId) {
-                        System.out.println("i == this.nodeId");
-                        System.out.println(this.nodeId);
                         continue;
                     }
                     BroadcastRequest request = new BroadcastRequest(chain_id, "PRECOMMIT", block);
-                    System.out.println("try broadcast " + String.valueOf(ports.get(i)));
                     String uri = HOST_URI + ports.get(i) + BROADCAST_URI;
                     
                     StatusReply reply;
@@ -376,11 +350,8 @@ public class Node {
                 }
                 Boolean success = false;
                 int majority = (int) Math.ceil(ports.size() * 2.0 / 3);
-                System.out.println("majority "+String.valueOf(majority));
-                System.out.println("vote result "+ String.valueOf(vote));
                 if(vote >= majority){
                     //Commit
-                    System.out.println("try commit");
                     block_chain.add(block);
                     success = true;
                     returnCode =200;
@@ -406,7 +377,6 @@ public class Node {
 
                     }
                 }else{
-                    System.out.println("fail commit");
                     returnCode = 409;
                 }
                 StatusReply reply = new StatusReply(success);
@@ -421,6 +391,9 @@ public class Node {
         }));
     }
 
+    /**
+     * broadcast API: Broadcast from a node to peers to request adding a block.
+     */
     private void broadcast(){
         this.node_skeleton.createContext("/broadcast", (exchange -> {
             String respText = "";
@@ -444,7 +417,6 @@ public class Node {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 }
-                // System.out.println("start broadcast");
                 int chain_id = broadcastRequest.getChainId();
                 String type = broadcastRequest.getRequestType();
                 Block block = broadcastRequest.getBlock();
@@ -530,7 +502,6 @@ public class Node {
         FileOutputStream f = new FileOutputStream("node.log",true);
         System.setOut(new PrintStream(f));
         Node node = new Node(args[0], args[1]);
-//        node.start();
     }
 
 

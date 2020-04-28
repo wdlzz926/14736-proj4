@@ -1,16 +1,8 @@
 package server;
-
 import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpServer;
-
-import org.apache.commons.codec.binary.Hex;
-
 import com.sun.net.httpserver.HttpExchange;
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -21,25 +13,24 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
-
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-
 import java.io.*;
 import lib.MessageSender;
 import message.*;
 
+/**
+ * API specifies all types of messages that a server node shall handle.
+ */
 public class Server {
     protected static final String HOST_URI = "http://127.0.0.1:";
     protected static final String GET_CHAIN_URI = "/getchain";
     protected static final String MINE_BLOCK_URI = "/mineblock";
     protected static final String ADD_BLOCK_URI = "/addblock";
-    protected static final String BROADCAST_URI = "/broadcast";
-
     private Gson gson = new Gson();
     private HttpServer server_skeleton;
     private MessageSender messageSender = new MessageSender(20);
@@ -51,6 +42,11 @@ public class Server {
     private PublicKey pub;
     private String user_name;
 
+    /**
+     * constructor.
+     * @param server_port server port
+     * @param blockchain_port blockchain id
+     */
     Server(int server_port, int blockchain_port) {
         this.user_name = String.valueOf(server_port);
         this.blockchain_port = blockchain_port;
@@ -61,25 +57,22 @@ public class Server {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-
         this.server_skeleton.setExecutor(null);
-
         this.add_api();
         this.server_skeleton.start();
 
     }
 
-    // Register public key pair with key blockchain
+    /**
+     * Register public key pair with key blockchain
+      */
     private void registration_key() {
-        System.out.println("Start registration");
-        System.out.flush();
         try {
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
             kpg.initialize(2048);
             KeyPair kp = kpg.generateKeyPair();
             pub = kp.getPublic();
             pvt = kp.getPrivate();
-            System.out.println("pub key "+pub.getEncoded());
             String pub_str = Base64.getEncoder().encodeToString(pub.getEncoded());
             Map<String, String> data = new HashMap<String, String>();
             data.put("user_name", this.user_name);
@@ -95,7 +88,6 @@ public class Server {
                 StatusReply add_reply = messageSender.post(uri, gson.toJson(add_request), StatusReply.class);
                 status = add_reply.getSuccess();
             }
-
         } catch (Exception e) {
             e.printStackTrace(System.out);
         }
@@ -109,6 +101,9 @@ public class Server {
         this.countVote();
     }
 
+    /**
+     * become candidate API: Add a normal client to the list of candidates competing in the election.
+     */
     private void becomeCandidate() {
         this.server_skeleton.createContext("/becomecandidate", (exchange -> {
             FileOutputStream f = new FileOutputStream("voteserver.log", true);
@@ -126,7 +121,6 @@ public class Server {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 }
-
                 String candidate = bcr.getCandidateName();
                 // check if already candidate
                 if (candidates.contains(candidate)) {
@@ -136,7 +130,6 @@ public class Server {
                     this.generateResponseAndClose(exchange, respText, returnCode);
                     return;
                 }
-
                 // Get current id chain
                 GetChainRequest chain_requst = new GetChainRequest(1);
                 String uri = HOST_URI + String.valueOf(blockchain_port) + GET_CHAIN_URI;
@@ -176,6 +169,9 @@ public class Server {
         }));
     }
 
+    /**
+     * get candidates API: Get the list of candidates contesting in the election.
+     */
     private void getCandidate() {
         this.server_skeleton.createContext("/getcandidates", (exchange -> {
             FileOutputStream f = new FileOutputStream("voteserver.log", true);
@@ -195,7 +191,12 @@ public class Server {
         }));
     }
 
-    // add vote to vote blockchain
+    /**
+     *  add vote to vote blockchain
+     * @param voter voter string
+     * @param vote vote string
+     * @param voter_pub public key of voter
+     */
     private void addVote(String voter, String vote, PublicKey voter_pub) {
         Cipher cipher = null;
         try {
@@ -227,12 +228,8 @@ public class Server {
         try {
         MineBlockRequest request = new MineBlockRequest(2, data);
         String uri = HOST_URI + blockchain_port + MINE_BLOCK_URI;
-        // System.out.println(gson.toJson(request));
-        // System.out.println(uri);
         BlockReply reply = messageSender.post(uri, gson.toJson(request), BlockReply.class); 
         Block block = reply.getBlock();
-        // System.out.println("Server info Block: "+block.toString());
-        // System.out.flush();
         AddBlockRequest add_request = new AddBlockRequest(2, block);
         uri = HOST_URI + String.valueOf(blockchain_port) + ADD_BLOCK_URI;
         Boolean status = false;
@@ -242,14 +239,13 @@ public class Server {
         }
 
         } catch (Exception e) {
-        // TODO Auto-generated catch block
         e.printStackTrace();
     }
-
-        
     }
 
-
+    /**
+     * cast vote API: Cast a vote for a candidate.
+     */
     private void castVote() {
         this.server_skeleton.createContext("/castvote", (exchange -> {
             FileOutputStream f = new FileOutputStream("voteserver.log", true);
@@ -270,15 +266,11 @@ public class Server {
 
                 String contents = cvr.getEncryptedVotes();
                 String session_key = cvr.getEncryptedSessionKey();
-                // System.out.println(contents);
-                // System.out.flush();
-
                 try {
                     Cipher cipher = Cipher.getInstance("RSA");
                     cipher.init(Cipher.DECRYPT_MODE, pvt);
                     byte[] tmp = Base64.getDecoder().decode(session_key);
                     byte[] key_bytes = cipher.doFinal(tmp);
-                    System.out.println("session key "+Hex.encodeHexString(key_bytes));
                     SecretKeySpec key = new SecretKeySpec(key_bytes,"AES");
                     Cipher aes_cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
                     byte[] iv = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -286,8 +278,6 @@ public class Server {
                     aes_cipher.init(Cipher.DECRYPT_MODE,key,ivspec);
                     String decrypt_contents = new String(aes_cipher.doFinal(Base64.getDecoder().decode(contents)));
                     Encrypted_vote vote = gson.fromJson(decrypt_contents, Encrypted_vote.class);
-                    System.out.println(decrypt_contents);
-                    System.out.flush();
                     //check signature
                     PublicKey client_public = getPulicKey(vote.getUserName());
                     Signature sign = Signature.getInstance("SHA1withRSA");
@@ -296,15 +286,11 @@ public class Server {
                     String sign_str = "\"user_name\":" + vote.getUserName() + ",\n \"voted_for\": " + vote.getVotedFor();
                     sign.update(sign_str.getBytes());
                     Boolean verify = sign.verify(signature);
-                    System.out.println("signature verified");
-                    
                     if(!verify){
                         //wrong signature
                         throw new Exception();
                     }
-
                     String user_name = vote.getUserName();
-                    System.out.println("Voter "+user_name);
                     if(voted_client.contains(user_name)){
                         returnCode = 409;
                         StatusReply reply = new StatusReply(false, "DuplicateVote");
@@ -312,9 +298,7 @@ public class Server {
                         this.generateResponseAndClose(exchange, respText, returnCode);
                         return;
                     }
-                    
                     String vote_candidate = vote.getVotedFor();
-                    System.out.println("Voted for "+vote_candidate);
                     if(candidates.contains(vote_candidate)){
                         int cur_vote = vote_count.get(vote_candidate);
                         vote_count.put(vote_candidate, cur_vote+1);
@@ -328,10 +312,6 @@ public class Server {
                         StatusReply reply = new StatusReply(false, "InvalidCandidate");
                         respText = gson.toJson(reply);
                     }
-
-
-
-
                 } catch (Exception e) {
                     // TODO Auto-generated catch block
                     returnCode = 422;
@@ -339,11 +319,6 @@ public class Server {
                     respText = gson.toJson(reply);
                     e.printStackTrace(System.out);
                 }
-
-
-
-
-
             }else{
                 respText = "The REST method should be POST for <service api>!\n";
                 returnCode = 400;
@@ -352,12 +327,16 @@ public class Server {
         }));
     }
 
+    /**
+     * get server public key.
+     * @return server public key
+     * @throws Exception
+     */
     private PublicKey getPulicKey(String user_name) throws Exception {
         String uri = HOST_URI + blockchain_port + GET_CHAIN_URI;
         GetChainRequest chain_requst = new GetChainRequest(1);
         GetChainReply chain_reply = messageSender.post(uri, gson.toJson(chain_requst), GetChainReply.class);
         List<Block> blocks = chain_reply.getBlocks();
-//        Boolean found = false;
         for (Block b : blocks) {
             if (user_name.equals(b.getData().get("user_name"))) {
                 String publickey = b.getData().get("public_key");
@@ -371,6 +350,9 @@ public class Server {
         return null;
     }
 
+    /**
+     * count vote API: Count the votes per candidate.
+     */
     private void countVote(){
         this.server_skeleton.createContext("/countvotes", (exchange -> {
             String respText = "";
